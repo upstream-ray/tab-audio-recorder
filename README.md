@@ -1,28 +1,39 @@
-# Tab Audio Recorder
+# 标签页音频录制器
 
-Chrome / Edge Manifest V3 extension for recording the current tab audio locally as `.webm` with Opus audio.
+这是一个 Chrome / Edge Manifest V3 浏览器扩展，用于把当前标签页的音频录制成本地 `.webm` 文件，音频编码优先使用 Opus。
 
-## Load locally
+适合在浏览器里观看直播、课程、知识视频时，一边戴耳机正常收听，一边录下当前标签页声音。扩展只负责本地录音，不上传录音，也不调用任何转写 API。
 
-1. Open `chrome://extensions` or `edge://extensions`.
-2. Enable developer mode.
-3. Choose "Load unpacked".
-4. Select this folder: `D:\code\tab-audio-recorder`.
+## 本地加载
 
-## Use
+1. 打开 `chrome://extensions` 或 `edge://extensions`。
+2. 开启“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择这个文件夹：`D:\code\tab-audio-recorder`。
 
-1. Open a video, course, or live stream page.
-2. Keep the page playing and do not mute the tab.
-3. Click the extension icon.
-4. Click "开始录制当前标签页".
-5. Click "停止并保存" when finished.
-6. The browser downloads a `.webm` file named like `网页标题_YYYY-MM-DD_HH-mm-ss.webm`.
+## 使用方法
 
-The extension only uses the browser download mechanism. It does not upload recordings or call transcription APIs.
+1. 打开视频、课程或直播页面。
+2. 确认页面正在正常播放，并且不要把网页或标签页静音。
+3. 点击浏览器工具栏里的扩展图标。
+4. 点击“开始录制当前标签页”。
+5. 录制过程中可以关闭弹窗，录音不会中断。
+6. 结束时点击“停止并保存”。
+7. 浏览器会自动下载一个 `.webm` 文件，文件名类似：`网页标题_YYYY-MM-DD_HH-mm-ss.webm`。
 
-## Notes
+下载后的文件可以用 Chrome、VLC 等播放器打开，也可以手动上传到通义听悟等转写服务。
 
-- Requires Chrome 116+ or a Chromium-based Edge version with `chrome.offscreen` and `chrome.tabCapture` support.
-- The tab audio is replayed through `AudioContext`, so headphones still work while recording.
-- Very long recordings are kept in memory until stopped. A future segmented-save version should be used for multi-hour sessions.
-- DRM-protected or browser-internal pages may not be capturable.
+## 隐私说明
+
+- 扩展只使用浏览器下载机制保存本地文件。
+- 扩展不会上传录音文件。
+- 扩展不会调用转写 API。
+- 扩展不会录制麦克风或系统全局声音，只捕获当前标签页音频。
+
+## 注意事项
+
+- 需要 Chrome 116+，或支持 `chrome.offscreen` 和 `chrome.tabCapture` 的 Chromium 内核 Edge。
+- 标签页被捕获后，扩展会通过 `AudioContext` 把声音重新播放出来，所以戴耳机时仍然可以正常听到声音。
+- 如果网页播放器或浏览器标签页被静音，可能录不到声音。
+- 很长的录音会在停止前暂存在浏览器内存中。多小时录制建议后续使用自动分段保存版本。
+- DRM 保护内容、浏览器内置页面或扩展页面可能无法被捕获。

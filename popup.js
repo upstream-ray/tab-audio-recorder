@@ -9,6 +9,7 @@ const els = {
   pauseButton: document.getElementById('pauseButton'),
   stopButton: document.getElementById('stopButton'),
   exportButton: document.getElementById('exportButton'),
+  resetButton: document.getElementById('resetButton'),
   message: document.getElementById('message')
 };
 
@@ -21,10 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
   els.pauseButton.addEventListener('click', onPauseClick);
   els.stopButton.addEventListener('click', onStopClick);
   els.exportButton.addEventListener('click', onExportClick);
+  els.resetButton.addEventListener('click', onResetClick);
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.target === 'popup' && message?.type === 'STATUS_CHANGED') {
       renderStatus(message.status || { state: 'idle' });
+      if (message.notice?.text) {
+        setMessage(message.notice.text, message.notice.level || '');
+      }
     }
   });
 
@@ -119,10 +124,41 @@ async function onExportClick() {
   }
 }
 
+async function onResetClick() {
+  const state = currentStatus.state;
+  let confirmText = '确定要重置吗？将清理所有状态，回到待机。';
+  if (state === 'recording' || state === 'paused') {
+    confirmText = '当前正在录制，重置会停止并丢弃这段录音。确定继续吗？';
+  } else if (state === 'ready') {
+    confirmText = '确定要丢弃这段尚未导出的录音吗？此操作无法撤销。';
+  }
+
+  if (!confirm(confirmText)) {
+    return;
+  }
+
+  setBusy(true);
+  setMessage('正在重置...');
+
+  try {
+    const response = await sendMessage({ target: 'background', type: 'RESET_ALL' });
+    renderStatus(response.status);
+    setMessage('已重置，可以开始新的录制。');
+  } catch (error) {
+    setMessage(error.message, 'error');
+    await refreshStatus();
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function refreshStatus() {
   try {
     const response = await sendMessage({ target: 'background', type: 'GET_STATUS' });
     renderStatus(response.status);
+    if (response.notice?.text) {
+      setMessage(response.notice.text, response.notice.level || '');
+    }
   } catch (error) {
     setMessage(error.message, 'error');
     renderStatus({ state: 'idle' });
@@ -157,6 +193,7 @@ function renderStatus(status) {
     els.pauseButton.textContent = '暂停录制';
     els.stopButton.disabled = false;
     els.exportButton.disabled = true;
+    els.resetButton.disabled = false;
   } else if (currentStatus.state === 'paused') {
     els.statusText.textContent = '已暂停';
     els.startButton.disabled = true;
@@ -164,6 +201,7 @@ function renderStatus(status) {
     els.pauseButton.textContent = '继续录制';
     els.stopButton.disabled = false;
     els.exportButton.disabled = true;
+    els.resetButton.disabled = false;
   } else if (currentStatus.state === 'ready') {
     els.statusText.textContent = '待导出';
     els.startButton.disabled = true;
@@ -171,6 +209,7 @@ function renderStatus(status) {
     els.pauseButton.textContent = '暂停录制';
     els.stopButton.disabled = true;
     els.exportButton.disabled = false;
+    els.resetButton.disabled = false;
   } else if (currentStatus.state === 'stopping' || currentStatus.state === 'saving' || currentStatus.state === 'exporting') {
     els.statusText.textContent = currentStatus.state === 'exporting' ? '正在导出' : '正在停止';
     els.startButton.disabled = true;
@@ -178,6 +217,7 @@ function renderStatus(status) {
     els.pauseButton.textContent = '暂停录制';
     els.stopButton.disabled = true;
     els.exportButton.disabled = true;
+    els.resetButton.disabled = false;
   } else {
     els.statusText.textContent = '待机';
     els.startButton.disabled = false;
@@ -185,6 +225,7 @@ function renderStatus(status) {
     els.pauseButton.textContent = '暂停录制';
     els.stopButton.disabled = true;
     els.exportButton.disabled = true;
+    els.resetButton.disabled = false;
   }
 
   updateTimer();
@@ -215,6 +256,7 @@ function setBusy(isBusy) {
     els.pauseButton.disabled = true;
     els.stopButton.disabled = true;
     els.exportButton.disabled = true;
+    els.resetButton.disabled = true;
     return;
   }
 

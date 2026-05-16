@@ -1,9 +1,12 @@
 const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 const OFFSCREEN_DOCUMENT_URL = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
 const DOWNLOAD_CLEANUP_TIMEOUT_MS = 10 * 60 * 1000;
+const FALLBACK_DOWNLOAD_CLEANUP_TIMEOUT_MS = 60 * 1000;
+const STOP_RECORDING_TIMEOUT_MS = 30 * 1000;
 
 let creatingOffscreenDocument;
 const pendingDownloadObjectUrls = new Set();
+const pendingStopRequests = new Map();
 
 chrome.runtime.onInstalled.addListener(() => {
   setRecordingBadge(false);
@@ -14,6 +17,10 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.target && message.target !== 'background') {
+    return false;
+  }
+
   handleMessage(message, sender)
     .then(sendResponse)
     .catch((error) => {
@@ -44,6 +51,20 @@ async function handleMessage(message) {
       await broadcastStatus({ state: 'saving' });
       await downloadRecording(message.recording);
       await broadcastStatus({ state: 'idle' });
+      return { ok: true };
+
+    case 'OFFSCREEN_RECORDING_STOPPED':
+      resolvePendingStopRequest(message.requestId, {
+        ok: true,
+        recording: message.recording
+      });
+      return { ok: true };
+
+    case 'OFFSCREEN_RECORDING_FAILED':
+      rejectPendingStopRequest(
+        message.requestId,
+        new Error(message.error || 'offscreen 停止录音失败。')
+      );
       return { ok: true };
 
     default:
@@ -107,24 +128,42 @@ async function stopRecording() {
 
   await broadcastStatus({ ...currentStatus, state: 'stopping' });
 
-  const response = await chrome.runtime.sendMessage({
-    target: 'offscreen',
-    type: 'STOP_RECORDING'
-  });
+  const requestId = createRequestId();
+  const stopResult = waitForOffscreenStop(requestId);
 
-  if (!response?.ok) {
-    throw new Error(response?.error || '停止录音失败。');
+  let stopAck;
+  try {
+    stopAck = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'STOP_RECORDING',
+      requestId
+    });
+  } catch (error) {
+    clearPendingStopRequest(requestId);
+    throw error;
+  }
+
+  if (!stopAck?.ok) {
+    clearPendingStopRequest(requestId);
+    throw new Error(stopAck?.error || '录音后台没有接收停止请求。请重新打开扩展后再试。');
+  }
+
+  const response = await stopResult;
+
+  if (!response.recording?.objectUrl) {
+    throw new Error('录音已停止，但没有生成可下载文件。');
   }
 
   await setRecordingBadge(false);
-  const downloadId = await downloadRecording(response.recording);
+  const downloadResult = await downloadRecording(response.recording);
   const status = { state: 'idle' };
   await broadcastStatus(status);
 
   return {
     ok: true,
     status,
-    downloadId,
+    downloadId: downloadResult.downloadId,
+    downloadMethod: downloadResult.method,
     recording: {
       filename: response.recording.filename,
       mimeType: response.recording.mimeType,
@@ -132,6 +171,61 @@ async function stopRecording() {
       durationMs: response.recording.durationMs
     }
   };
+}
+
+function waitForOffscreenStop(requestId) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      pendingStopRequests.delete(requestId);
+      reject(new Error('等待录音文件生成超时。请在扩展详情页查看 service worker/offscreen 错误日志。'));
+    }, STOP_RECORDING_TIMEOUT_MS);
+
+    pendingStopRequests.set(requestId, {
+      timeoutId,
+      resolve,
+      reject
+    });
+  });
+}
+
+function resolvePendingStopRequest(requestId, value) {
+  const pending = pendingStopRequests.get(requestId);
+  if (!pending) {
+    return;
+  }
+
+  clearTimeout(pending.timeoutId);
+  pendingStopRequests.delete(requestId);
+  pending.resolve(value);
+}
+
+function rejectPendingStopRequest(requestId, error) {
+  const pending = pendingStopRequests.get(requestId);
+  if (!pending) {
+    return;
+  }
+
+  clearTimeout(pending.timeoutId);
+  pendingStopRequests.delete(requestId);
+  pending.reject(error);
+}
+
+function clearPendingStopRequest(requestId) {
+  const pending = pendingStopRequests.get(requestId);
+  if (!pending) {
+    return;
+  }
+
+  clearTimeout(pending.timeoutId);
+  pendingStopRequests.delete(requestId);
+}
+
+function createRequestId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 async function getActiveTab() {
@@ -219,16 +313,42 @@ async function downloadRecording(recording) {
     throw new Error('录音结果缺少下载信息。');
   }
 
-  const downloadId = await chrome.downloads.download({
-    url: recording.objectUrl,
-    filename: recording.filename,
-    saveAs: false,
-    conflictAction: 'uniquify'
-  });
-
   pendingDownloadObjectUrls.add(recording.objectUrl);
-  watchDownloadForCleanup(downloadId, recording.objectUrl);
-  return downloadId;
+
+  try {
+    const downloadId = await chrome.downloads.download({
+      url: recording.objectUrl,
+      filename: recording.filename,
+      saveAs: false,
+      conflictAction: 'uniquify'
+    });
+
+    watchDownloadForCleanup(downloadId, recording.objectUrl);
+    return { downloadId, method: 'downloads' };
+  } catch (error) {
+    try {
+      const fallback = await chrome.runtime.sendMessage({
+        target: 'offscreen',
+        type: 'DOWNLOAD_OBJECT_URL',
+        objectUrl: recording.objectUrl,
+        filename: recording.filename
+      });
+
+      if (!fallback?.ok) {
+        throw new Error(fallback?.error || '兜底下载也没有成功。');
+      }
+
+      setTimeout(
+        () => cleanupObjectUrl(recording.objectUrl),
+        FALLBACK_DOWNLOAD_CLEANUP_TIMEOUT_MS
+      );
+
+      return { downloadId: null, method: 'anchor' };
+    } catch (fallbackError) {
+      await cleanupObjectUrl(recording.objectUrl);
+      throw new Error(`浏览器下载失败：${toUserError(error)}；兜底下载失败：${toUserError(fallbackError)}`);
+    }
+  }
 }
 
 function watchDownloadForCleanup(downloadId, objectUrl) {
@@ -243,19 +363,7 @@ function watchDownloadForCleanup(downloadId, objectUrl) {
     done = true;
     clearTimeout(timeoutId);
     chrome.downloads.onChanged.removeListener(onChanged);
-    pendingDownloadObjectUrls.delete(objectUrl);
-
-    try {
-      await chrome.runtime.sendMessage({
-        target: 'offscreen',
-        type: 'REVOKE_OBJECT_URL',
-        objectUrl
-      });
-    } catch (error) {
-      // The offscreen document may already be gone.
-    }
-
-    await closeOffscreenDocumentIfIdle();
+    await cleanupObjectUrl(objectUrl);
   };
 
   const onChanged = (delta) => {
@@ -271,6 +379,22 @@ function watchDownloadForCleanup(downloadId, objectUrl) {
 
   chrome.downloads.onChanged.addListener(onChanged);
   timeoutId = setTimeout(cleanup, DOWNLOAD_CLEANUP_TIMEOUT_MS);
+}
+
+async function cleanupObjectUrl(objectUrl) {
+  pendingDownloadObjectUrls.delete(objectUrl);
+
+  try {
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'REVOKE_OBJECT_URL',
+      objectUrl
+    });
+  } catch (error) {
+    // The offscreen document may already be gone.
+  }
+
+  await closeOffscreenDocumentIfIdle();
 }
 
 async function closeOffscreenDocumentIfIdle() {
@@ -298,7 +422,7 @@ async function setRecordingBadge(isRecording) {
 
 async function broadcastStatus(status) {
   try {
-    await chrome.runtime.sendMessage({ type: 'STATUS_CHANGED', status });
+    await chrome.runtime.sendMessage({ target: 'popup', type: 'STATUS_CHANGED', status });
   } catch (error) {
     // No popup is listening right now.
   }

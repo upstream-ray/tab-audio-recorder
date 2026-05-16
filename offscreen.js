@@ -38,7 +38,17 @@ async function handleMessage(message) {
       return startRecording(message.payload);
 
     case 'STOP_RECORDING':
-      return stopRecording({ emitAutoStop: false });
+      stopRecording({
+        emitAutoStop: false,
+        requestId: message.requestId
+      }).catch((error) => {
+        notifyStopFailed(message.requestId, error);
+      });
+      return { ok: true, status: getStatus() };
+
+    case 'DOWNLOAD_OBJECT_URL':
+      downloadObjectUrl(message.objectUrl, message.filename);
+      return { ok: true };
 
     case 'REVOKE_OBJECT_URL':
       revokeObjectUrl(message.objectUrl);
@@ -104,13 +114,17 @@ async function startRecording(payload) {
   }
 }
 
-async function stopRecording({ emitAutoStop }) {
+async function stopRecording({ emitAutoStop, requestId }) {
   if (stoppingPromise) {
     return stoppingPromise;
   }
 
   if (!recorder || recorder.state === 'inactive') {
-    return { ok: true, status: getStatus() };
+    const response = { ok: true, status: getStatus() };
+    if (requestId) {
+      notifyStopFailed(requestId, new Error('录音已经停止，未找到可保存的录音数据。'));
+    }
+    return response;
   }
 
   stoppingPromise = new Promise((resolve, reject) => {
@@ -144,21 +158,40 @@ async function stopRecording({ emitAutoStop }) {
 
         if (emitAutoStop) {
           chrome.runtime.sendMessage({
+            target: 'background',
             type: 'OFFSCREEN_AUTO_STOPPED',
             recording
           }).catch(() => {});
         }
 
-        resolve({ ok: true, status: getStatus(), recording });
+        const response = { ok: true, status: getStatus(), recording };
+
+        if (requestId) {
+          chrome.runtime.sendMessage({
+            target: 'background',
+            type: 'OFFSCREEN_RECORDING_STOPPED',
+            requestId,
+            recording
+          }).catch(() => {});
+        }
+
+        resolve(response);
       } catch (error) {
         stoppingPromise = undefined;
+        if (requestId) {
+          notifyStopFailed(requestId, error);
+        }
         reject(error);
       }
     }, { once: true });
 
     activeRecorder.addEventListener('error', (event) => {
       stoppingPromise = undefined;
-      reject(event.error || new Error('MediaRecorder 出错。'));
+      const error = event.error || new Error('MediaRecorder 出错。');
+      if (requestId) {
+        notifyStopFailed(requestId, error);
+      }
+      reject(error);
     }, { once: true });
 
     if (activeRecorder.state === 'recording') {
@@ -253,9 +286,37 @@ function getRecordingMetadata() {
 
 async function notifyStatusChanged() {
   await chrome.runtime.sendMessage({
+    target: 'background',
     type: 'OFFSCREEN_STATUS_CHANGED',
     status: getStatus()
-  });
+  }).catch(() => {});
+}
+
+function notifyStopFailed(requestId, error) {
+  if (!requestId) {
+    return;
+  }
+
+  chrome.runtime.sendMessage({
+    target: 'background',
+    type: 'OFFSCREEN_RECORDING_FAILED',
+    requestId,
+    error: error?.message || String(error)
+  }).catch(() => {});
+}
+
+function downloadObjectUrl(objectUrl, filename) {
+  if (!objectUrl || !objectUrls.has(objectUrl)) {
+    throw new Error('录音下载地址已经失效。');
+  }
+
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename || 'tab-audio.webm';
+  link.rel = 'noopener';
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function revokeObjectUrl(objectUrl) {

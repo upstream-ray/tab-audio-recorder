@@ -35,7 +35,7 @@ async function onStartClick() {
   setMessage('正在启动录音...');
 
   try {
-    const response = await sendMessage({ type: 'START_RECORDING' });
+    const response = await sendMessage({ target: 'background', type: 'START_RECORDING' });
     renderStatus(response.status);
 
     if (response.warning) {
@@ -56,7 +56,7 @@ async function onStopClick() {
   setMessage('正在停止并准备下载...');
 
   try {
-    const response = await sendMessage({ type: 'STOP_RECORDING' });
+    const response = await sendMessage({ target: 'background', type: 'STOP_RECORDING' });
     renderStatus(response.status);
 
     if (response.recording?.filename) {
@@ -74,7 +74,7 @@ async function onStopClick() {
 
 async function refreshStatus() {
   try {
-    const response = await sendMessage({ type: 'GET_STATUS' });
+    const response = await sendMessage({ target: 'background', type: 'GET_STATUS' });
     renderStatus(response.status);
   } catch (error) {
     setMessage(error.message, 'error');

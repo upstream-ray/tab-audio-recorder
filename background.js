@@ -5,15 +5,16 @@ const FALLBACK_DOWNLOAD_CLEANUP_TIMEOUT_MS = 60 * 1000;
 const STOP_RECORDING_TIMEOUT_MS = 30 * 1000;
 
 let creatingOffscreenDocument;
+let readyRecording = null;
 const pendingDownloadObjectUrls = new Set();
 const pendingStopRequests = new Map();
 
 chrome.runtime.onInstalled.addListener(() => {
-  setRecordingBadge(false);
+  setStatusBadge({ state: 'idle' });
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  setRecordingBadge(false);
+  setStatusBadge({ state: 'idle' });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -38,19 +39,27 @@ async function handleMessage(message) {
     case 'START_RECORDING':
       return startRecording();
 
+    case 'PAUSE_RECORDING':
+      return pauseRecording();
+
+    case 'RESUME_RECORDING':
+      return resumeRecording();
+
     case 'STOP_RECORDING':
       return stopRecording();
 
+    case 'EXPORT_RECORDING':
+      return exportRecording();
+
     case 'OFFSCREEN_STATUS_CHANGED':
-      await setRecordingBadge(message.status?.state === 'recording');
+      await setStatusBadge(message.status);
       await broadcastStatus(message.status);
       return { ok: true };
 
     case 'OFFSCREEN_AUTO_STOPPED':
-      await setRecordingBadge(false);
-      await broadcastStatus({ state: 'saving' });
-      await downloadRecording(message.recording);
-      await broadcastStatus({ state: 'idle' });
+      readyRecording = message.recording;
+      await setStatusBadge(buildReadyStatus(message.recording));
+      await broadcastStatus(buildReadyStatus(message.recording));
       return { ok: true };
 
     case 'OFFSCREEN_RECORDING_STOPPED':
@@ -74,8 +83,12 @@ async function handleMessage(message) {
 
 async function startRecording() {
   const currentStatus = await getStatus();
-  if (currentStatus.state === 'recording' || currentStatus.state === 'stopping') {
-    return { ok: false, error: '已经在录制中。' };
+  if (['recording', 'paused', 'stopping'].includes(currentStatus.state)) {
+    return { ok: false, error: '已经有录音正在进行。' };
+  }
+
+  if (currentStatus.state === 'ready') {
+    return { ok: false, error: '已有一段录音待导出。请先导出后再开始新的录音。' };
   }
 
   const tab = await getActiveTab();
@@ -110,7 +123,8 @@ async function startRecording() {
     throw new Error(response?.error || '启动录音失败。');
   }
 
-  await setRecordingBadge(true);
+  readyRecording = null;
+  await setStatusBadge(response.status);
   await broadcastStatus(response.status);
 
   return {
@@ -120,9 +134,53 @@ async function startRecording() {
   };
 }
 
+async function pauseRecording() {
+  const currentStatus = await getStatus();
+  if (currentStatus.state !== 'recording') {
+    return { ok: false, error: '当前没有正在录制的内容。' };
+  }
+
+  const response = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: 'PAUSE_RECORDING'
+  });
+
+  if (!response?.ok) {
+    throw new Error(response?.error || '暂停录音失败。');
+  }
+
+  await setStatusBadge(response.status);
+  await broadcastStatus(response.status);
+  return { ok: true, status: response.status };
+}
+
+async function resumeRecording() {
+  const currentStatus = await getStatus();
+  if (currentStatus.state !== 'paused') {
+    return { ok: false, error: '当前录音没有处于暂停状态。' };
+  }
+
+  const response = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: 'RESUME_RECORDING'
+  });
+
+  if (!response?.ok) {
+    throw new Error(response?.error || '继续录音失败。');
+  }
+
+  await setStatusBadge(response.status);
+  await broadcastStatus(response.status);
+  return { ok: true, status: response.status };
+}
+
 async function stopRecording() {
   const currentStatus = await getStatus();
-  if (currentStatus.state !== 'recording' && currentStatus.state !== 'stopping') {
+  if (currentStatus.state === 'stopping') {
+    return { ok: true, status: currentStatus, message: '正在停止录音。' };
+  }
+
+  if (currentStatus.state !== 'recording' && currentStatus.state !== 'paused') {
     return { ok: true, status: currentStatus, message: '当前没有正在进行的录音。' };
   }
 
@@ -154,9 +212,37 @@ async function stopRecording() {
     throw new Error('录音已停止，但没有生成可下载文件。');
   }
 
-  await setRecordingBadge(false);
-  const downloadResult = await downloadRecording(response.recording);
+  readyRecording = response.recording;
+  const status = buildReadyStatus(response.recording);
+  await setStatusBadge(status);
+  await broadcastStatus(status);
+
+  return {
+    ok: true,
+    status,
+    recording: toPublicRecording(response.recording)
+  };
+}
+
+async function exportRecording() {
+  const recording = await getReadyRecording();
+  if (!recording?.objectUrl) {
+    return { ok: false, error: '没有可导出的录音文件。请先完成一次录音。' };
+  }
+
+  const exportingStatus = {
+    ...buildReadyStatus(recording),
+    state: 'exporting'
+  };
+  await setStatusBadge(exportingStatus);
+  await broadcastStatus(exportingStatus);
+
+  const downloadResult = await downloadRecording(recording);
+  readyRecording = null;
+  await clearReadyRecording(recording.objectUrl);
+
   const status = { state: 'idle' };
+  await setStatusBadge(status);
   await broadcastStatus(status);
 
   return {
@@ -164,12 +250,7 @@ async function stopRecording() {
     status,
     downloadId: downloadResult.downloadId,
     downloadMethod: downloadResult.method,
-    recording: {
-      filename: response.recording.filename,
-      mimeType: response.recording.mimeType,
-      size: response.recording.size,
-      durationMs: response.recording.durationMs
-    }
+    recording: toPublicRecording(recording)
   };
 }
 
@@ -255,7 +336,8 @@ function validateTab(tab) {
 async function getStatus() {
   const context = await getOffscreenContext();
   if (!context) {
-    await setRecordingBadge(false);
+    readyRecording = null;
+    await setStatusBadge({ state: 'idle' });
     return { state: 'idle' };
   }
 
@@ -266,15 +348,20 @@ async function getStatus() {
     });
 
     if (response?.ok) {
-      await setRecordingBadge(response.status?.state === 'recording');
-      return response.status;
+      if (response.recording?.objectUrl) {
+        readyRecording = response.recording;
+      }
+
+      const status = stripPrivateStatus(response.status);
+      await setStatusBadge(status);
+      return status;
     }
   } catch (error) {
     // Fall back to the document URL hash if the offscreen document is alive but busy.
   }
 
   const state = context.documentUrl?.includes('#recording') ? 'recording' : 'idle';
-  await setRecordingBadge(state === 'recording');
+  await setStatusBadge({ state });
   return { state };
 }
 
@@ -351,6 +438,40 @@ async function downloadRecording(recording) {
   }
 }
 
+async function getReadyRecording() {
+  if (readyRecording?.objectUrl) {
+    return readyRecording;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'GET_READY_RECORDING'
+    });
+
+    if (response?.ok && response.recording?.objectUrl) {
+      readyRecording = response.recording;
+      return readyRecording;
+    }
+  } catch (error) {
+    // No ready recording is available in the offscreen document.
+  }
+
+  return null;
+}
+
+async function clearReadyRecording(objectUrl) {
+  try {
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'CLEAR_READY_RECORDING',
+      objectUrl
+    });
+  } catch (error) {
+    // The offscreen document may already be gone.
+  }
+}
+
 function watchDownloadForCleanup(downloadId, objectUrl) {
   let done = false;
   let timeoutId;
@@ -413,19 +534,67 @@ async function closeOffscreenDocumentIfIdle() {
   }
 }
 
-async function setRecordingBadge(isRecording) {
-  await chrome.action.setBadgeText({ text: isRecording ? 'REC' : '' });
-  if (isRecording) {
-    await chrome.action.setBadgeBackgroundColor({ color: '#d93025' });
+async function setStatusBadge(status) {
+  const state = status?.state || 'idle';
+  const badgeByState = {
+    recording: { text: 'REC', color: '#d93025' },
+    paused: { text: 'PAU', color: '#b36200' },
+    ready: { text: 'OK', color: '#16833a' },
+    exporting: { text: 'OUT', color: '#1456d9' }
+  };
+  const badge = badgeByState[state] || { text: '', color: '#607089' };
+
+  await chrome.action.setBadgeText({ text: badge.text });
+  if (badge.text) {
+    await chrome.action.setBadgeBackgroundColor({ color: badge.color });
   }
 }
 
 async function broadcastStatus(status) {
   try {
-    await chrome.runtime.sendMessage({ target: 'popup', type: 'STATUS_CHANGED', status });
+    await chrome.runtime.sendMessage({
+      target: 'popup',
+      type: 'STATUS_CHANGED',
+      status: stripPrivateStatus(status)
+    });
   } catch (error) {
     // No popup is listening right now.
   }
+}
+
+function buildReadyStatus(recording) {
+  return {
+    state: 'ready',
+    title: recording?.title || '',
+    filename: recording?.filename || '',
+    mimeType: recording?.mimeType || 'audio/webm',
+    size: recording?.size || 0,
+    durationMs: recording?.durationMs || 0,
+    elapsedMs: recording?.durationMs || 0,
+    startedAt: recording?.startedAt || '',
+    finishedAt: recording?.finishedAt || '',
+    tabId: recording?.tabId
+  };
+}
+
+function toPublicRecording(recording) {
+  return {
+    filename: recording?.filename || '',
+    mimeType: recording?.mimeType || 'audio/webm',
+    size: recording?.size || 0,
+    durationMs: recording?.durationMs || 0,
+    startedAt: recording?.startedAt || '',
+    finishedAt: recording?.finishedAt || ''
+  };
+}
+
+function stripPrivateStatus(status) {
+  if (!status) {
+    return { state: 'idle' };
+  }
+
+  const { objectUrl, recording, ...publicStatus } = status;
+  return publicStatus;
 }
 
 function buildRecordingFilename(title, date) {

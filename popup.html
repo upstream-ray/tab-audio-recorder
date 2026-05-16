@@ -30,13 +30,19 @@
         </div>
         <div class="info-row">
           <span>保存方式</span>
-          <strong>浏览器下载</strong>
+          <strong>手动导出</strong>
+        </div>
+        <div class="info-row">
+          <span>文件状态</span>
+          <strong id="fileState">未生成</strong>
         </div>
       </section>
 
       <div class="actions">
         <button id="startButton" type="button">开始录制当前标签页</button>
-        <button id="stopButton" class="danger" type="button" disabled>停止并保存</button>
+        <button id="pauseButton" class="secondary" type="button" disabled>暂停录制</button>
+        <button id="stopButton" class="danger" type="button" disabled>停止录制</button>
+        <button id="exportButton" class="success" type="button" disabled>导出录音文件</button>
       </div>
 
       <p class="message" id="message" role="status" aria-live="polite"></p>

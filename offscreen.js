@@ -12,7 +12,10 @@ let chunks = [];
 let totalBytes = 0;
 let selectedMimeType = '';
 let currentRecording = null;
+let completedRecording = null;
 let stoppingPromise;
+let recordedDurationMs = 0;
+let recordingRunStartedAt = 0;
 const objectUrls = new Set();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -32,10 +35,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleMessage(message) {
   switch (message.type) {
     case 'GET_STATUS':
-      return { ok: true, status: getStatus() };
+      return {
+        ok: true,
+        status: getStatus(),
+        recording: completedRecording
+      };
 
     case 'START_RECORDING':
       return startRecording(message.payload);
+
+    case 'PAUSE_RECORDING':
+      return pauseRecording();
+
+    case 'RESUME_RECORDING':
+      return resumeRecording();
 
     case 'STOP_RECORDING':
       stopRecording({
@@ -50,6 +63,14 @@ async function handleMessage(message) {
       downloadObjectUrl(message.objectUrl, message.filename);
       return { ok: true };
 
+    case 'GET_READY_RECORDING':
+      return { ok: true, recording: completedRecording };
+
+    case 'CLEAR_READY_RECORDING':
+      clearCompletedRecording(message.objectUrl);
+      notifyStatusChanged();
+      return { ok: true };
+
     case 'REVOKE_OBJECT_URL':
       revokeObjectUrl(message.objectUrl);
       return { ok: true };
@@ -60,11 +81,16 @@ async function handleMessage(message) {
 }
 
 async function startRecording(payload) {
-  if (recorder?.state === 'recording' || stoppingPromise) {
+  if ((recorder && recorder.state !== 'inactive') || stoppingPromise) {
     throw new Error('录音已经在进行中。');
   }
 
+  if (completedRecording) {
+    throw new Error('已有一段录音待导出。请先导出后再开始新的录音。');
+  }
+
   resetRecordingState();
+  resetDurationState();
 
   currentRecording = {
     tabId: payload.tabId,
@@ -102,6 +128,7 @@ async function startRecording(payload) {
     });
 
     recorder.start(1000);
+    startDurationRun();
     window.location.hash = 'recording';
 
     await notifyStatusChanged();
@@ -114,8 +141,37 @@ async function startRecording(payload) {
   }
 }
 
+async function pauseRecording() {
+  if (!recorder || recorder.state !== 'recording') {
+    throw new Error('当前没有正在录制的内容。');
+  }
+
+  recorder.requestData();
+  recorder.pause();
+  pauseDurationRun();
+  await notifyStatusChanged();
+  return { ok: true, status: getStatus() };
+}
+
+async function resumeRecording() {
+  if (!recorder || recorder.state !== 'paused') {
+    throw new Error('当前录音没有处于暂停状态。');
+  }
+
+  recorder.resume();
+  startDurationRun();
+  await notifyStatusChanged();
+  return { ok: true, status: getStatus() };
+}
+
 async function stopRecording({ emitAutoStop, requestId }) {
   if (stoppingPromise) {
+    if (requestId) {
+      stoppingPromise
+        .then((response) => notifyStopped(requestId, response.recording))
+        .catch((error) => notifyStopFailed(requestId, error));
+    }
+
     return stoppingPromise;
   }
 
@@ -132,6 +188,10 @@ async function stopRecording({ emitAutoStop, requestId }) {
 
     activeRecorder.addEventListener('stop', async () => {
       try {
+        if (recordingRunStartedAt) {
+          pauseDurationRun();
+        }
+
         const mimeType = activeRecorder.mimeType || selectedMimeType || 'audio/webm';
         const blob = new Blob(chunks, { type: mimeType });
         const objectUrl = URL.createObjectURL(blob);
@@ -142,7 +202,7 @@ async function stopRecording({ emitAutoStop, requestId }) {
           filename: currentRecording.filename,
           mimeType,
           size: blob.size,
-          durationMs: Date.now() - Date.parse(currentRecording.startedAt),
+          durationMs: getElapsedMs(),
           startedAt: currentRecording.startedAt,
           finishedAt: new Date().toISOString(),
           title: currentRecording.title,
@@ -150,8 +210,10 @@ async function stopRecording({ emitAutoStop, requestId }) {
           tabId: currentRecording.tabId
         };
 
+        completedRecording = recording;
         await cleanupMedia();
         resetRecordingState();
+        resetDurationState();
         window.location.hash = '';
         stoppingPromise = undefined;
         await notifyStatusChanged();
@@ -167,12 +229,7 @@ async function stopRecording({ emitAutoStop, requestId }) {
         const response = { ok: true, status: getStatus(), recording };
 
         if (requestId) {
-          chrome.runtime.sendMessage({
-            target: 'background',
-            type: 'OFFSCREEN_RECORDING_STOPPED',
-            requestId,
-            recording
-          }).catch(() => {});
+          notifyStopped(requestId, recording);
         }
 
         resolve(response);
@@ -194,7 +251,7 @@ async function stopRecording({ emitAutoStop, requestId }) {
       reject(error);
     }, { once: true });
 
-    if (activeRecorder.state === 'recording') {
+    if (activeRecorder.state !== 'inactive') {
       activeRecorder.requestData();
       activeRecorder.stop();
     }
@@ -219,7 +276,7 @@ function keepCapturedAudioAudible(stream) {
 function attachUnexpectedEndHandlers(stream) {
   for (const track of stream.getTracks()) {
     track.addEventListener('ended', () => {
-      if (recorder?.state === 'recording') {
+      if (recorder && recorder.state !== 'inactive' && !stoppingPromise) {
         stopRecording({ emitAutoStop: true });
       }
     }, { once: true });
@@ -251,6 +308,32 @@ function resetRecordingState() {
   currentRecording = null;
 }
 
+function resetDurationState() {
+  recordedDurationMs = 0;
+  recordingRunStartedAt = 0;
+}
+
+function startDurationRun() {
+  recordingRunStartedAt = Date.now();
+}
+
+function pauseDurationRun() {
+  if (!recordingRunStartedAt) {
+    return;
+  }
+
+  recordedDurationMs += Date.now() - recordingRunStartedAt;
+  recordingRunStartedAt = 0;
+}
+
+function getElapsedMs() {
+  if (recordingRunStartedAt) {
+    return recordedDurationMs + Date.now() - recordingRunStartedAt;
+  }
+
+  return recordedDurationMs;
+}
+
 function chooseMimeType() {
   return MIME_TYPE_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type)) || '';
 }
@@ -270,6 +353,28 @@ function getStatus() {
     };
   }
 
+  if (recorder?.state === 'paused') {
+    return {
+      state: 'paused',
+      ...getRecordingMetadata()
+    };
+  }
+
+  if (completedRecording) {
+    return {
+      state: 'ready',
+      title: completedRecording.title,
+      filename: completedRecording.filename,
+      mimeType: completedRecording.mimeType,
+      size: completedRecording.size,
+      durationMs: completedRecording.durationMs,
+      elapsedMs: completedRecording.durationMs,
+      startedAt: completedRecording.startedAt,
+      finishedAt: completedRecording.finishedAt,
+      tabId: completedRecording.tabId
+    };
+  }
+
   return { state: 'idle' };
 }
 
@@ -280,6 +385,7 @@ function getRecordingMetadata() {
     startedAt: currentRecording?.startedAt || '',
     mimeType: recorder?.mimeType || selectedMimeType || 'audio/webm',
     sizeEstimate: totalBytes,
+    elapsedMs: getElapsedMs(),
     tabId: currentRecording?.tabId
   };
 }
@@ -305,6 +411,25 @@ function notifyStopFailed(requestId, error) {
   }).catch(() => {});
 }
 
+function notifyStopped(requestId, recording) {
+  chrome.runtime.sendMessage({
+    target: 'background',
+    type: 'OFFSCREEN_RECORDING_STOPPED',
+    requestId,
+    recording
+  }).catch(() => {});
+}
+
+function clearCompletedRecording(objectUrl) {
+  if (!completedRecording) {
+    return;
+  }
+
+  if (!objectUrl || completedRecording.objectUrl === objectUrl) {
+    completedRecording = null;
+  }
+}
+
 function downloadObjectUrl(objectUrl, filename) {
   if (!objectUrl || !objectUrls.has(objectUrl)) {
     throw new Error('录音下载地址已经失效。');
@@ -324,6 +449,7 @@ function revokeObjectUrl(objectUrl) {
     return;
   }
 
+  clearCompletedRecording(objectUrl);
   URL.revokeObjectURL(objectUrl);
   objectUrls.delete(objectUrl);
 }

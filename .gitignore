@@ -1,0 +1,27 @@
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+*.log
+
+# 扩展打包与密钥
+*.zip
+*.crx
+*.pem
+.env*
+
+# 本地录音测试样本
+*.webm

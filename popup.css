@@ -182,6 +182,20 @@ button.success:hover:not(:disabled) {
   background: #0f6f2f;
 }
 
+button.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  min-height: 34px;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: #f0f3f8;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .message {
   min-height: 20px;
   margin-top: 10px;

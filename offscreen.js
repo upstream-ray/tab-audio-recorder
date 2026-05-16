@@ -75,6 +75,10 @@ async function handleMessage(message) {
       revokeObjectUrl(message.objectUrl);
       return { ok: true };
 
+    case 'FORCE_RESET':
+      await forceReset();
+      return { ok: true };
+
     default:
       return { ok: false, error: 'offscreen 收到未知指令。' };
   }
@@ -418,6 +422,35 @@ function notifyStopped(requestId, recording) {
     requestId,
     recording
   }).catch(() => {});
+}
+
+async function forceReset() {
+  if (recorder && recorder.state !== 'inactive') {
+    try {
+      recorder.stop();
+    } catch (error) {
+      // Recorder may already be in a terminal state.
+    }
+  }
+
+  await cleanupMedia();
+  resetRecordingState();
+  resetDurationState();
+
+  for (const url of Array.from(objectUrls)) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      // Ignore.
+    }
+  }
+  objectUrls.clear();
+
+  completedRecording = null;
+  stoppingPromise = undefined;
+  window.location.hash = '';
+
+  await notifyStatusChanged();
 }
 
 function clearCompletedRecording(objectUrl) {

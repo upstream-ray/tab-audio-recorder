@@ -6,6 +6,7 @@ const STOP_RECORDING_TIMEOUT_MS = 30 * 1000;
 
 let creatingOffscreenDocument;
 let readyRecording = null;
+let pendingNotice = null;
 const pendingDownloadObjectUrls = new Set();
 const pendingStopRequests = new Map();
 
@@ -16,6 +17,64 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   setStatusBadge({ state: 'idle' });
 });
+
+if (chrome.commands?.onCommand) {
+  chrome.commands.onCommand.addListener(handleCommand);
+}
+
+async function handleCommand(command) {
+  try {
+    if (command === 'toggle-recording') {
+      const status = await getStatus();
+      if (status.state === 'recording' || status.state === 'paused') {
+        const result = await stopRecording();
+        await notifyUser(
+          '录音已停止',
+          result.recording?.filename
+            ? `已生成：${result.recording.filename}，请打开扩展导出。`
+            : '请打开扩展查看状态。'
+        );
+      } else if (status.state === 'idle') {
+        const result = await startRecording();
+        if (result.ok) {
+          await notifyUser('开始录制', result.warning || '正在录制当前标签页音频。');
+        } else {
+          await notifyUser('无法开始录制', result.error || '请打开扩展查看详情。');
+        }
+      } else if (status.state === 'ready') {
+        await notifyUser('有待导出录音', '请打开扩展导出或丢弃后再开始新的录制。');
+      }
+    } else if (command === 'toggle-pause') {
+      const status = await getStatus();
+      if (status.state === 'recording') {
+        await pauseRecording();
+        await notifyUser('录音已暂停', '页面声音仍在播放，可再次按快捷键继续。');
+      } else if (status.state === 'paused') {
+        await resumeRecording();
+        await notifyUser('录音已继续', '继续把标签页音频写入文件。');
+      }
+    }
+  } catch (error) {
+    await notifyUser('操作失败', toUserError(error));
+  }
+}
+
+async function notifyUser(title, message) {
+  if (!chrome.notifications?.create) {
+    return;
+  }
+  try {
+    await chrome.notifications.create({
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title,
+      message: message || '',
+      priority: 1
+    });
+  } catch (error) {
+    // Notifications may be disabled by the user — fail silently.
+  }
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target && message.target !== 'background') {
@@ -33,8 +92,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleMessage(message) {
   switch (message?.type) {
-    case 'GET_STATUS':
-      return { ok: true, status: await getStatus() };
+    case 'GET_STATUS': {
+      const status = await getStatus();
+      const notice = consumePendingNotice();
+      return { ok: true, status, notice };
+    }
 
     case 'START_RECORDING':
       return startRecording();
@@ -51,16 +113,26 @@ async function handleMessage(message) {
     case 'EXPORT_RECORDING':
       return exportRecording();
 
+    case 'RESET_ALL':
+      return resetAll();
+
     case 'OFFSCREEN_STATUS_CHANGED':
       await setStatusBadge(message.status);
       await broadcastStatus(message.status);
       return { ok: true };
 
-    case 'OFFSCREEN_AUTO_STOPPED':
+    case 'OFFSCREEN_AUTO_STOPPED': {
       readyRecording = message.recording;
-      await setStatusBadge(buildReadyStatus(message.recording));
-      await broadcastStatus(buildReadyStatus(message.recording));
+      const readyStatus = buildReadyStatus(message.recording);
+      const notice = {
+        level: 'warning',
+        text: '录制目标已结束（标签页关闭或音频流中断），录音已自动保存，请导出。'
+      };
+      pendingNotice = notice;
+      await setStatusBadge(readyStatus);
+      await broadcastStatus(readyStatus, notice);
       return { ok: true };
+    }
 
     case 'OFFSCREEN_RECORDING_STOPPED':
       resolvePendingStopRequest(message.requestId, {
@@ -230,14 +302,21 @@ async function exportRecording() {
     return { ok: false, error: '没有可导出的录音文件。请先完成一次录音。' };
   }
 
-  const exportingStatus = {
-    ...buildReadyStatus(recording),
-    state: 'exporting'
-  };
+  const readyStatus = buildReadyStatus(recording);
+  const exportingStatus = { ...readyStatus, state: 'exporting' };
   await setStatusBadge(exportingStatus);
   await broadcastStatus(exportingStatus);
 
-  const downloadResult = await downloadRecording(recording);
+  let downloadResult;
+  try {
+    downloadResult = await downloadRecording(recording);
+  } catch (error) {
+    readyRecording = recording;
+    await setStatusBadge(readyStatus);
+    await broadcastStatus(readyStatus);
+    throw error;
+  }
+
   readyRecording = null;
   await clearReadyRecording(recording.objectUrl);
 
@@ -252,6 +331,52 @@ async function exportRecording() {
     downloadMethod: downloadResult.method,
     recording: toPublicRecording(recording)
   };
+}
+
+async function resetAll() {
+  for (const requestId of Array.from(pendingStopRequests.keys())) {
+    rejectPendingStopRequest(requestId, new Error('已被用户重置。'));
+  }
+
+  try {
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'FORCE_RESET'
+    });
+  } catch (error) {
+    // No offscreen document is alive.
+  }
+
+  const objectUrls = Array.from(pendingDownloadObjectUrls);
+  pendingDownloadObjectUrls.clear();
+  for (const url of objectUrls) {
+    try {
+      await chrome.runtime.sendMessage({
+        target: 'offscreen',
+        type: 'REVOKE_OBJECT_URL',
+        objectUrl: url
+      });
+    } catch (error) {
+      // Offscreen may already be gone.
+    }
+  }
+
+  readyRecording = null;
+  pendingNotice = null;
+
+  const context = await getOffscreenContext();
+  if (context) {
+    try {
+      await chrome.offscreen.closeDocument();
+    } catch (error) {
+      // Already closed.
+    }
+  }
+
+  const status = { state: 'idle' };
+  await setStatusBadge(status);
+  await broadcastStatus(status);
+  return { ok: true, status };
 }
 
 function waitForOffscreenStop(requestId) {
@@ -432,7 +557,7 @@ async function downloadRecording(recording) {
 
       return { downloadId: null, method: 'anchor' };
     } catch (fallbackError) {
-      await cleanupObjectUrl(recording.objectUrl);
+      pendingDownloadObjectUrls.delete(recording.objectUrl);
       throw new Error(`浏览器下载失败：${toUserError(error)}；兜底下载失败：${toUserError(fallbackError)}`);
     }
   }
@@ -550,16 +675,29 @@ async function setStatusBadge(status) {
   }
 }
 
-async function broadcastStatus(status) {
+async function broadcastStatus(status, notice) {
   try {
-    await chrome.runtime.sendMessage({
+    const payload = {
       target: 'popup',
       type: 'STATUS_CHANGED',
       status: stripPrivateStatus(status)
-    });
+    };
+    if (notice) {
+      payload.notice = notice;
+    }
+    await chrome.runtime.sendMessage(payload);
+    if (notice && pendingNotice === notice) {
+      pendingNotice = null;
+    }
   } catch (error) {
-    // No popup is listening right now.
+    // No popup is listening right now — keep pendingNotice for the next GET_STATUS.
   }
+}
+
+function consumePendingNotice() {
+  const notice = pendingNotice;
+  pendingNotice = null;
+  return notice;
 }
 
 function buildReadyStatus(recording) {

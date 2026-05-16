@@ -28,6 +28,23 @@
     "offscreen",
     "downloads",
     "activeTab",
-    "tabs"
-  ]
+    "tabs",
+    "notifications"
+  ],
+  "commands": {
+    "toggle-recording": {
+      "suggested_key": {
+        "default": "Alt+Shift+9",
+        "mac": "Alt+Shift+9"
+      },
+      "description": "开始 / 停止录制当前标签页音频"
+    },
+    "toggle-pause": {
+      "suggested_key": {
+        "default": "Alt+Shift+8",
+        "mac": "Alt+Shift+8"
+      },
+      "description": "暂停 / 继续录音"
+    }
+  }
 }

@@ -29,7 +29,8 @@
     "downloads",
     "activeTab",
     "tabs",
-    "notifications"
+    "notifications",
+    "storage"
   ],
   "commands": {
     "toggle-recording": {

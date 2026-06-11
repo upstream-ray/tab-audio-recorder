@@ -10,7 +10,8 @@ const els = {
   stopButton: document.getElementById('stopButton'),
   exportButton: document.getElementById('exportButton'),
   resetButton: document.getElementById('resetButton'),
-  message: document.getElementById('message')
+  message: document.getElementById('message'),
+  autoSyncToggle: document.getElementById('autoSyncToggle')
 };
 
 let currentStatus = { state: 'idle' };
@@ -23,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
   els.stopButton.addEventListener('click', onStopClick);
   els.exportButton.addEventListener('click', onExportClick);
   els.resetButton.addEventListener('click', onResetClick);
+  els.autoSyncToggle.addEventListener('change', onAutoSyncChange);
+
+  loadAutoSyncState();
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.target === 'popup' && message?.type === 'STATUS_CHANGED') {
@@ -152,6 +156,24 @@ async function onResetClick() {
   }
 }
 
+async function onAutoSyncChange() {
+  const enabled = els.autoSyncToggle.checked;
+  try {
+    await sendMessage({ target: 'background', type: 'SET_AUTO_SYNC', enabled });
+  } catch (error) {
+    els.autoSyncToggle.checked = !enabled;
+  }
+}
+
+async function loadAutoSyncState() {
+  try {
+    const response = await sendMessage({ target: 'background', type: 'GET_AUTO_SYNC' });
+    els.autoSyncToggle.checked = response.autoSyncEnabled !== false;
+  } catch (error) {
+    els.autoSyncToggle.checked = true;
+  }
+}
+
 async function refreshStatus() {
   try {
     const response = await sendMessage({ target: 'background', type: 'GET_STATUS' });
@@ -195,7 +217,7 @@ function renderStatus(status) {
     els.exportButton.disabled = true;
     els.resetButton.disabled = false;
   } else if (currentStatus.state === 'paused') {
-    els.statusText.textContent = '已暂停';
+    els.statusText.textContent = currentStatus.autoPaused ? '已自动暂停' : '已暂停';
     els.startButton.disabled = true;
     els.pauseButton.disabled = false;
     els.pauseButton.textContent = '继续录制';

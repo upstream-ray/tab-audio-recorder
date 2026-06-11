@@ -10,6 +10,16 @@ let pendingNotice = null;
 const pendingDownloadObjectUrls = new Set();
 const pendingStopRequests = new Map();
 
+let activeRecordingTabId = null;
+let autoPaused = false;
+let autoSyncEnabled = true;
+
+chrome.storage.local.get('autoSyncEnabled', (result) => {
+  if (result.autoSyncEnabled !== undefined) {
+    autoSyncEnabled = result.autoSyncEnabled;
+  }
+});
+
 chrome.runtime.onInstalled.addListener(() => {
   setStatusBadge({ state: 'idle' });
 });
@@ -21,6 +31,13 @@ chrome.runtime.onStartup.addListener(() => {
 if (chrome.commands?.onCommand) {
   chrome.commands.onCommand.addListener(handleCommand);
 }
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!autoSyncEnabled || tabId !== activeRecordingTabId || changeInfo.audible === undefined) {
+    return;
+  }
+  handleTabAudibleChange(changeInfo.audible);
+});
 
 async function handleCommand(command) {
   try {
@@ -50,6 +67,7 @@ async function handleCommand(command) {
         await pauseRecording();
         await notifyUser('录音已暂停', '页面声音仍在播放，可再次按快捷键继续。');
       } else if (status.state === 'paused') {
+        autoPaused = false;
         await resumeRecording();
         await notifyUser('录音已继续', '继续把标签页音频写入文件。');
       }
@@ -76,6 +94,25 @@ async function notifyUser(title, message) {
   }
 }
 
+async function handleTabAudibleChange(audible) {
+  try {
+    const status = await getStatus();
+    if (!audible && status.state === 'recording') {
+      autoPaused = true;
+      try {
+        await pauseRecording();
+      } catch (error) {
+        autoPaused = false;
+      }
+    } else if (audible && autoPaused && status.state === 'paused') {
+      autoPaused = false;
+      await resumeRecording();
+    }
+  } catch (error) {
+    // Don't disrupt recording for monitoring errors.
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target && message.target !== 'background') {
     return false;
@@ -95,7 +132,7 @@ async function handleMessage(message) {
     case 'GET_STATUS': {
       const status = await getStatus();
       const notice = consumePendingNotice();
-      return { ok: true, status, notice };
+      return { ok: true, status: enrichStatus(status), notice };
     }
 
     case 'START_RECORDING':
@@ -105,6 +142,7 @@ async function handleMessage(message) {
       return pauseRecording();
 
     case 'RESUME_RECORDING':
+      autoPaused = false;
       return resumeRecording();
 
     case 'STOP_RECORDING':
@@ -122,6 +160,8 @@ async function handleMessage(message) {
       return { ok: true };
 
     case 'OFFSCREEN_AUTO_STOPPED': {
+      activeRecordingTabId = null;
+      autoPaused = false;
       readyRecording = message.recording;
       const readyStatus = buildReadyStatus(message.recording);
       const notice = {
@@ -147,6 +187,15 @@ async function handleMessage(message) {
         new Error(message.error || 'offscreen 停止录音失败。')
       );
       return { ok: true };
+
+    case 'GET_AUTO_SYNC':
+      return { ok: true, autoSyncEnabled };
+
+    case 'SET_AUTO_SYNC':
+      autoSyncEnabled = !!message.enabled;
+      chrome.storage.local.set({ autoSyncEnabled });
+      if (!autoSyncEnabled) autoPaused = false;
+      return { ok: true, autoSyncEnabled };
 
     default:
       return { ok: false, error: '未知指令。' };
@@ -196,6 +245,7 @@ async function startRecording() {
   }
 
   readyRecording = null;
+  activeRecordingTabId = tab.id;
   await setStatusBadge(response.status);
   await broadcastStatus(response.status);
 
@@ -280,6 +330,9 @@ async function stopRecording() {
 
   const response = await stopResult;
 
+  activeRecordingTabId = null;
+  autoPaused = false;
+
   if (!response.recording?.objectUrl) {
     throw new Error('录音已停止，但没有生成可下载文件。');
   }
@@ -334,6 +387,9 @@ async function exportRecording() {
 }
 
 async function resetAll() {
+  activeRecordingTabId = null;
+  autoPaused = false;
+
   for (const requestId of Array.from(pendingStopRequests.keys())) {
     rejectPendingStopRequest(requestId, new Error('已被用户重置。'));
   }
@@ -475,6 +531,10 @@ async function getStatus() {
     if (response?.ok) {
       if (response.recording?.objectUrl) {
         readyRecording = response.recording;
+      }
+
+      if (['recording', 'paused'].includes(response.status?.state) && response.status?.tabId) {
+        activeRecordingTabId = response.status.tabId;
       }
 
       const status = stripPrivateStatus(response.status);
@@ -680,7 +740,7 @@ async function broadcastStatus(status, notice) {
     const payload = {
       target: 'popup',
       type: 'STATUS_CHANGED',
-      status: stripPrivateStatus(status)
+      status: enrichStatus(stripPrivateStatus(status))
     };
     if (notice) {
       payload.notice = notice;
@@ -724,6 +784,14 @@ function toPublicRecording(recording) {
     startedAt: recording?.startedAt || '',
     finishedAt: recording?.finishedAt || ''
   };
+}
+
+function enrichStatus(status) {
+  if (!status) return { state: 'idle' };
+  if (autoPaused && status.state === 'paused') {
+    return { ...status, autoPaused: true };
+  }
+  return status;
 }
 
 function stripPrivateStatus(status) {

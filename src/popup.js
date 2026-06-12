@@ -1,3 +1,21 @@
+const t = (key, subs) => chrome.i18n.getMessage(key, subs);
+
+function localizeStatic() {
+  document.documentElement.lang = chrome.i18n.getUILanguage();
+  for (const node of document.querySelectorAll('[data-i18n]')) {
+    const message = t(node.dataset.i18n);
+    if (message) {
+      node.textContent = message;
+    }
+  }
+  for (const node of document.querySelectorAll('[data-i18n-aria]')) {
+    const message = t(node.dataset.i18nAria);
+    if (message) {
+      node.setAttribute('aria-label', message);
+    }
+  }
+}
+
 const els = {
   statusDot: document.getElementById('statusDot'),
   statusText: document.getElementById('statusText'),
@@ -19,6 +37,8 @@ let statusReceivedAt = Date.now();
 let timerId;
 
 document.addEventListener('DOMContentLoaded', () => {
+  localizeStatic();
+
   els.startButton.addEventListener('click', onStartClick);
   els.pauseButton.addEventListener('click', onPauseClick);
   els.stopButton.addEventListener('click', onStopClick);
@@ -47,7 +67,7 @@ window.addEventListener('unload', () => {
 
 async function onStartClick() {
   setBusy(true);
-  setMessage('正在启动录音...');
+  setMessage(t('msgStarting'));
 
   try {
     const response = await sendMessage({ target: 'background', type: 'START_RECORDING' });
@@ -56,7 +76,7 @@ async function onStartClick() {
     if (response.warning) {
       setMessage(response.warning, 'warning');
     } else {
-      setMessage('录音已开始。关闭弹窗不会中断录音。');
+      setMessage(t('msgStarted'));
     }
   } catch (error) {
     setMessage(error.message, 'error');
@@ -69,7 +89,7 @@ async function onStartClick() {
 async function onPauseClick() {
   const isPaused = currentStatus.state === 'paused';
   setBusy(true);
-  setMessage(isPaused ? '正在继续录音...' : '正在暂停录音...');
+  setMessage(isPaused ? t('msgResuming') : t('msgPausing'));
 
   try {
     const response = await sendMessage({
@@ -77,7 +97,7 @@ async function onPauseClick() {
       type: isPaused ? 'RESUME_RECORDING' : 'PAUSE_RECORDING'
     });
     renderStatus(response.status);
-    setMessage(isPaused ? '已继续录音。' : '录音已暂停，页面声音仍会继续播放。');
+    setMessage(isPaused ? t('msgResumed') : t('msgPaused'));
   } catch (error) {
     setMessage(error.message, 'error');
     await refreshStatus();
@@ -88,16 +108,16 @@ async function onPauseClick() {
 
 async function onStopClick() {
   setBusy(true);
-  setMessage('正在停止录音...');
+  setMessage(t('msgStopping'));
 
   try {
     const response = await sendMessage({ target: 'background', type: 'STOP_RECORDING' });
     renderStatus(response.status);
 
     if (response.recording?.filename) {
-      setMessage(`录音已生成：${response.recording.filename}`);
+      setMessage(t('msgRecordingSaved', [response.recording.filename]));
     } else {
-      setMessage(response.message || '当前没有正在进行的录音。');
+      setMessage(response.message || t('msgNoOngoingRecording'));
     }
   } catch (error) {
     setMessage(error.message, 'error');
@@ -109,16 +129,16 @@ async function onStopClick() {
 
 async function onExportClick() {
   setBusy(true);
-  setMessage('正在导出录音文件...');
+  setMessage(t('msgExporting'));
 
   try {
     const response = await sendMessage({ target: 'background', type: 'EXPORT_RECORDING' });
     renderStatus(response.status);
 
     if (response.recording?.filename) {
-      setMessage(`已发送到浏览器下载：${response.recording.filename}`);
+      setMessage(t('msgSentToDownloads', [response.recording.filename]));
     } else {
-      setMessage('没有可导出的录音文件。', 'warning');
+      setMessage(t('msgNothingToExport'), 'warning');
     }
   } catch (error) {
     setMessage(error.message, 'error');
@@ -130,11 +150,11 @@ async function onExportClick() {
 
 async function onResetClick() {
   const state = currentStatus.state;
-  let confirmText = '确定要重置吗？将清理所有状态，回到待机。';
+  let confirmText = t('confirmResetDefault');
   if (state === 'recording' || state === 'paused') {
-    confirmText = '当前正在录制，重置会停止并丢弃这段录音。确定继续吗？';
+    confirmText = t('confirmResetRecording');
   } else if (state === 'ready') {
-    confirmText = '确定要丢弃这段尚未导出的录音吗？此操作无法撤销。';
+    confirmText = t('confirmResetReady');
   }
 
   if (!confirm(confirmText)) {
@@ -142,12 +162,12 @@ async function onResetClick() {
   }
 
   setBusy(true);
-  setMessage('正在重置...');
+  setMessage(t('msgResetting'));
 
   try {
     const response = await sendMessage({ target: 'background', type: 'RESET_ALL' });
     renderStatus(response.status);
-    setMessage('已重置，可以开始新的录制。');
+    setMessage(t('msgResetDone'));
   } catch (error) {
     setMessage(error.message, 'error');
     await refreshStatus();
@@ -191,7 +211,7 @@ async function sendMessage(message) {
   const response = await chrome.runtime.sendMessage(message);
 
   if (!response?.ok) {
-    throw new Error(response?.error || '插件后台没有返回有效响应。');
+    throw new Error(response?.error || t('errNoBackendResponse'));
   }
 
   return response;
@@ -209,42 +229,42 @@ function renderStatus(status) {
   els.fileState.textContent = getFileStateText(currentStatus);
 
   if (currentStatus.state === 'recording') {
-    els.statusText.textContent = '录制中';
+    els.statusText.textContent = t('statusRecording');
     els.startButton.disabled = true;
     els.pauseButton.disabled = false;
-    els.pauseButton.textContent = '暂停录制';
+    els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = false;
     els.exportButton.disabled = true;
     els.resetButton.disabled = false;
   } else if (currentStatus.state === 'paused') {
-    els.statusText.textContent = currentStatus.autoPaused ? '已自动暂停' : '已暂停';
+    els.statusText.textContent = currentStatus.autoPaused ? t('statusAutoPaused') : t('statusPaused');
     els.startButton.disabled = true;
     els.pauseButton.disabled = false;
-    els.pauseButton.textContent = '继续录制';
+    els.pauseButton.textContent = t('btnResume');
     els.stopButton.disabled = false;
     els.exportButton.disabled = true;
     els.resetButton.disabled = false;
   } else if (currentStatus.state === 'ready') {
-    els.statusText.textContent = '待导出';
+    els.statusText.textContent = t('statusReadyToExport');
     els.startButton.disabled = true;
     els.pauseButton.disabled = true;
-    els.pauseButton.textContent = '暂停录制';
+    els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = true;
     els.exportButton.disabled = false;
     els.resetButton.disabled = false;
   } else if (currentStatus.state === 'stopping' || currentStatus.state === 'saving' || currentStatus.state === 'exporting') {
-    els.statusText.textContent = currentStatus.state === 'exporting' ? '正在导出' : '正在停止';
+    els.statusText.textContent = currentStatus.state === 'exporting' ? t('statusExporting') : t('statusStopping');
     els.startButton.disabled = true;
     els.pauseButton.disabled = true;
-    els.pauseButton.textContent = '暂停录制';
+    els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = true;
     els.exportButton.disabled = true;
     els.resetButton.disabled = false;
   } else {
-    els.statusText.textContent = '待机';
+    els.statusText.textContent = t('statusIdle');
     els.startButton.disabled = false;
     els.pauseButton.disabled = true;
-    els.pauseButton.textContent = '暂停录制';
+    els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = true;
     els.exportButton.disabled = true;
     els.resetButton.disabled = false;
@@ -314,18 +334,18 @@ function getDisplayElapsedMs() {
 
 function getFileStateText(status) {
   if (status.state === 'recording' || status.state === 'paused') {
-    return status.sizeEstimate ? `缓存 ${formatBytes(status.sizeEstimate)}` : '录制中';
+    return status.sizeEstimate ? t('fileStateBuffered', [formatBytes(status.sizeEstimate)]) : t('statusRecording');
   }
 
   if (status.state === 'ready') {
-    return status.size ? `待导出 ${formatBytes(status.size)}` : '待导出';
+    return status.size ? t('fileStateReadySized', [formatBytes(status.size)]) : t('statusReadyToExport');
   }
 
   if (status.state === 'exporting') {
-    return '正在导出';
+    return t('statusExporting');
   }
 
-  return '未生成';
+  return t('fileStateNone');
 }
 
 function formatBytes(bytes) {

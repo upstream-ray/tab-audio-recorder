@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Tab Audio Recorder",
-  "description": "Record the current tab audio locally as WebM/Opus.",
+  "name": "__MSG_extName__",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "version": "0.1.0",
   "minimum_chrome_version": "116",
   "action": {
-    "default_title": "录制当前标签页音频",
+    "default_title": "__MSG_actionTitle__",
     "default_popup": "src/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -38,14 +39,14 @@
         "default": "Alt+Shift+9",
         "mac": "Alt+Shift+9"
       },
-      "description": "开始 / 停止录制当前标签页音频"
+      "description": "__MSG_cmdToggleRecording__"
     },
     "toggle-pause": {
       "suggested_key": {
         "default": "Alt+Shift+8",
         "mac": "Alt+Shift+8"
       },
-      "description": "暂停 / 继续录音"
+      "description": "__MSG_cmdTogglePause__"
     }
   }
 }

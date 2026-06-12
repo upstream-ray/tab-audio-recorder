@@ -1,3 +1,5 @@
+const t = (key, subs) => chrome.i18n.getMessage(key, subs);
+
 const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen.html';
 const OFFSCREEN_DOCUMENT_URL = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
 const DOWNLOAD_CLEANUP_TIMEOUT_MS = 10 * 60 * 1000;
@@ -61,34 +63,34 @@ async function handleCommand(command) {
       if (status.state === 'recording' || status.state === 'paused') {
         const result = await stopRecording();
         await notifyUser(
-          '录音已停止',
+          t('notifyStoppedTitle'),
           result.recording?.filename
-            ? `已生成：${result.recording.filename}，请打开扩展导出。`
-            : '请打开扩展查看状态。'
+            ? t('notifyStoppedSaved', [result.recording.filename])
+            : t('notifyStoppedOpen')
         );
       } else if (status.state === 'idle') {
         const result = await startRecording();
         if (result.ok) {
-          await notifyUser('开始录制', result.warning || '正在录制当前标签页音频。');
+          await notifyUser(t('notifyStartTitle'), result.warning || t('notifyStartBody'));
         } else {
-          await notifyUser('无法开始录制', result.error || '请打开扩展查看详情。');
+          await notifyUser(t('notifyCantStartTitle'), result.error || t('notifyCantStartBody'));
         }
       } else if (status.state === 'ready') {
-        await notifyUser('有待导出录音', '请打开扩展导出或丢弃后再开始新的录制。');
+        await notifyUser(t('notifyReadyPendingTitle'), t('notifyReadyPendingBody'));
       }
     } else if (command === 'toggle-pause') {
       const status = await getStatus();
       if (status.state === 'recording') {
         await pauseRecording();
-        await notifyUser('录音已暂停', '页面声音仍在播放，可再次按快捷键继续。');
+        await notifyUser(t('notifyPausedTitle'), t('notifyPausedBody'));
       } else if (status.state === 'paused') {
         setAutoPaused(false);
         await resumeRecording();
-        await notifyUser('录音已继续', '继续把标签页音频写入文件。');
+        await notifyUser(t('notifyResumedTitle'), t('notifyResumedBody'));
       }
     }
   } catch (error) {
-    await notifyUser('操作失败', toUserError(error));
+    await notifyUser(t('notifyActionFailedTitle'), toUserError(error));
   }
 }
 
@@ -210,7 +212,7 @@ async function handleMessage(message) {
       const readyStatus = buildReadyStatus(message.recording);
       const notice = {
         level: 'warning',
-        text: '录制目标已结束（标签页关闭或音频流中断），录音已自动保存，请导出。'
+        text: t('noticeAutoStopped')
       };
       pendingNotice = notice;
       await setStatusBadge(readyStatus);
@@ -228,7 +230,7 @@ async function handleMessage(message) {
     case 'OFFSCREEN_RECORDING_FAILED':
       rejectPendingStopRequest(
         message.requestId,
-        new Error(message.error || 'offscreen 停止录音失败。')
+        new Error(message.error || t('errOffscreenStopFailed'))
       );
       return { ok: true };
 
@@ -254,25 +256,25 @@ async function handleMessage(message) {
       return { ok: true, autoSyncEnabled };
 
     default:
-      return { ok: false, error: '未知指令。' };
+      return { ok: false, error: t('errUnknownCommand') };
   }
 }
 
 async function startRecording() {
   const currentStatus = await getStatus();
   if (['recording', 'paused', 'stopping'].includes(currentStatus.state)) {
-    return { ok: false, error: '已经有录音正在进行。' };
+    return { ok: false, error: t('errAlreadyRecording') };
   }
 
   if (currentStatus.state === 'ready') {
-    return { ok: false, error: '已有一段录音待导出。请先导出后再开始新的录音。' };
+    return { ok: false, error: t('errReadyPending') };
   }
 
   const tab = await getActiveTab();
   validateTab(tab);
 
   if (tab.mutedInfo?.muted) {
-    return { ok: false, error: '当前标签页处于静音状态。请先取消静音，再开始录制。' };
+    return { ok: false, error: t('errTabMuted') };
   }
 
   await ensureOffscreenDocument();
@@ -297,7 +299,7 @@ async function startRecording() {
   });
 
   if (!response?.ok) {
-    throw new Error(response?.error || '启动录音失败。');
+    throw new Error(response?.error || t('errStartFailed'));
   }
 
   readyRecording = null;
@@ -308,14 +310,14 @@ async function startRecording() {
   return {
     ok: true,
     status: response.status,
-    warning: tab.audible === false ? '当前标签页暂未检测到声音，开始播放后会继续录制。' : ''
+    warning: tab.audible === false ? t('warnTabSilent') : ''
   };
 }
 
 async function pauseRecording() {
   const currentStatus = await getStatus();
   if (currentStatus.state !== 'recording') {
-    return { ok: false, error: '当前没有正在录制的内容。' };
+    return { ok: false, error: t('errNoActiveContent') };
   }
 
   const response = await chrome.runtime.sendMessage({
@@ -324,7 +326,7 @@ async function pauseRecording() {
   });
 
   if (!response?.ok) {
-    throw new Error(response?.error || '暂停录音失败。');
+    throw new Error(response?.error || t('errPauseFailed'));
   }
 
   await setStatusBadge(response.status);
@@ -335,7 +337,7 @@ async function pauseRecording() {
 async function resumeRecording() {
   const currentStatus = await getStatus();
   if (currentStatus.state !== 'paused') {
-    return { ok: false, error: '当前录音没有处于暂停状态。' };
+    return { ok: false, error: t('errNotPaused') };
   }
 
   const response = await chrome.runtime.sendMessage({
@@ -344,7 +346,7 @@ async function resumeRecording() {
   });
 
   if (!response?.ok) {
-    throw new Error(response?.error || '继续录音失败。');
+    throw new Error(response?.error || t('errResumeFailed'));
   }
 
   await setStatusBadge(response.status);
@@ -355,11 +357,11 @@ async function resumeRecording() {
 async function stopRecording() {
   const currentStatus = await getStatus();
   if (currentStatus.state === 'stopping') {
-    return { ok: true, status: currentStatus, message: '正在停止录音。' };
+    return { ok: true, status: currentStatus, message: t('msgStoppingNow') };
   }
 
   if (currentStatus.state !== 'recording' && currentStatus.state !== 'paused') {
-    return { ok: true, status: currentStatus, message: '当前没有正在进行的录音。' };
+    return { ok: true, status: currentStatus, message: t('msgNoOngoingRecording') };
   }
 
   await broadcastStatus({ ...currentStatus, state: 'stopping' });
@@ -381,7 +383,7 @@ async function stopRecording() {
 
   if (!stopAck?.ok) {
     clearPendingStopRequest(requestId);
-    throw new Error(stopAck?.error || '录音后台没有接收停止请求。请重新打开扩展后再试。');
+    throw new Error(stopAck?.error || t('errStopNotReceived'));
   }
 
   const response = await stopResult;
@@ -390,7 +392,7 @@ async function stopRecording() {
   setAutoPaused(false);
 
   if (!response.recording?.objectUrl) {
-    throw new Error('录音已停止，但没有生成可下载文件。');
+    throw new Error(t('errStoppedNoFile'));
   }
 
   readyRecording = response.recording;
@@ -408,7 +410,7 @@ async function stopRecording() {
 async function exportRecording() {
   const recording = await getReadyRecording();
   if (!recording?.objectUrl) {
-    return { ok: false, error: '没有可导出的录音文件。请先完成一次录音。' };
+    return { ok: false, error: t('errNothingToExportYet') };
   }
 
   const readyStatus = buildReadyStatus(recording);
@@ -447,7 +449,7 @@ async function resetAll() {
   setAutoPaused(false);
 
   for (const requestId of Array.from(pendingStopRequests.keys())) {
-    rejectPendingStopRequest(requestId, new Error('已被用户重置。'));
+    rejectPendingStopRequest(requestId, new Error(t('errResetByUser')));
   }
 
   try {
@@ -495,7 +497,7 @@ function waitForOffscreenStop(requestId) {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       pendingStopRequests.delete(requestId);
-      reject(new Error('等待录音文件生成超时。请在扩展详情页查看 service worker/offscreen 错误日志。'));
+      reject(new Error(t('errStopTimeout')));
     }, STOP_RECORDING_TIMEOUT_MS);
 
     pendingStopRequests.set(requestId, {
@@ -549,7 +551,7 @@ function createRequestId() {
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    throw new Error('没有找到当前活动标签页。');
+    throw new Error(t('errNoActiveTab'));
   }
 
   return tab;
@@ -566,7 +568,7 @@ function validateTab(tab) {
   ];
 
   if (blockedSchemes.some((scheme) => url.startsWith(scheme))) {
-    throw new Error('浏览器内置页面或扩展页面不能被录制。请切换到视频/直播网页后再开始。');
+    throw new Error(t('errBlockedPage'));
   }
 }
 
@@ -638,7 +640,7 @@ async function ensureOffscreenDocument() {
 
 async function downloadRecording(recording) {
   if (!recording?.objectUrl || !recording?.filename) {
-    throw new Error('录音结果缺少下载信息。');
+    throw new Error(t('errMissingDownloadInfo'));
   }
 
   pendingDownloadObjectUrls.add(recording.objectUrl);
@@ -663,7 +665,7 @@ async function downloadRecording(recording) {
       });
 
       if (!fallback?.ok) {
-        throw new Error(fallback?.error || '兜底下载也没有成功。');
+        throw new Error(fallback?.error || t('errFallbackDownloadFailed'));
       }
 
       setTimeout(
@@ -674,7 +676,7 @@ async function downloadRecording(recording) {
       return { downloadId: null, method: 'anchor' };
     } catch (fallbackError) {
       pendingDownloadObjectUrls.delete(recording.objectUrl);
-      throw new Error(`浏览器下载失败：${toUserError(error)}；兜底下载失败：${toUserError(fallbackError)}`);
+      throw new Error(t('errDownloadFailed', [toUserError(error), toUserError(fallbackError)]));
     }
   }
 }
@@ -892,15 +894,15 @@ function toUserError(error) {
   const message = error?.message || String(error);
 
   if (message.includes('Cannot access contents of url')) {
-    return '当前页面不能被扩展访问，请换到普通网页后再试。';
+    return t('errCannotAccessPage');
   }
 
   if (message.includes('Could not start audio source') || message.includes('Permission denied')) {
-    return '无法捕获当前标签页音频。请确认已在视频/直播网页中点击开始，且浏览器允许标签页捕获。';
+    return t('errCannotCapture');
   }
 
   if (message.includes('Extension has not been invoked')) {
-    return '请从插件弹窗里点击开始录制，浏览器要求录音必须由用户主动触发。';
+    return t('errNeedUserGesture');
   }
 
   return message;

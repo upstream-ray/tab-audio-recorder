@@ -1,3 +1,5 @@
+const t = (key, subs) => chrome.i18n.getMessage(key, subs);
+
 const MIME_TYPE_CANDIDATES = [
   'audio/webm; codecs=opus',
   'audio/webm;codecs=opus',
@@ -88,17 +90,17 @@ async function handleMessage(message) {
       return { ok: true };
 
     default:
-      return { ok: false, error: 'offscreen 收到未知指令。' };
+      return { ok: false, error: t('errOffscreenUnknownCommand') };
   }
 }
 
 async function startRecording(payload) {
   if ((recorder && recorder.state !== 'inactive') || stoppingPromise) {
-    throw new Error('录音已经在进行中。');
+    throw new Error(t('errAlreadyRecordingInProgress'));
   }
 
   if (completedRecording) {
-    throw new Error('已有一段录音待导出。请先导出后再开始新的录音。');
+    throw new Error(t('errReadyPending'));
   }
 
   resetRecordingState();
@@ -155,7 +157,7 @@ async function startRecording(payload) {
 
 async function pauseRecording() {
   if (!recorder || recorder.state !== 'recording') {
-    throw new Error('当前没有正在录制的内容。');
+    throw new Error(t('errNoActiveContent'));
   }
 
   recorder.requestData();
@@ -167,7 +169,7 @@ async function pauseRecording() {
 
 async function resumeRecording() {
   if (!recorder || recorder.state !== 'paused') {
-    throw new Error('当前录音没有处于暂停状态。');
+    throw new Error(t('errNotPaused'));
   }
 
   recorder.resume();
@@ -190,7 +192,7 @@ async function stopRecording({ emitAutoStop, requestId }) {
   if (!recorder || recorder.state === 'inactive') {
     const response = { ok: true, status: getStatus() };
     if (requestId) {
-      notifyStopFailed(requestId, new Error('录音已经停止，未找到可保存的录音数据。'));
+      notifyStopFailed(requestId, new Error(t('errNoDataToSave')));
     }
     return response;
   }
@@ -256,7 +258,7 @@ async function stopRecording({ emitAutoStop, requestId }) {
 
     activeRecorder.addEventListener('error', (event) => {
       stoppingPromise = undefined;
-      const error = event.error || new Error('MediaRecorder 出错。');
+      const error = event.error || new Error(t('errMediaRecorder'));
       if (requestId) {
         notifyStopFailed(requestId, error);
       }
@@ -545,7 +547,7 @@ function clearCompletedRecording(objectUrl) {
 
 function downloadObjectUrl(objectUrl, filename) {
   if (!objectUrl || !objectUrls.has(objectUrl)) {
-    throw new Error('录音下载地址已经失效。');
+    throw new Error(t('errDownloadUrlExpired'));
   }
 
   const link = document.createElement('a');

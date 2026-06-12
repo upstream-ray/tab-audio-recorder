@@ -1,0 +1,107 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f9fc;--panel:#ffffff;--ink:#162033;--muted:#607089;--line:#dce3ed;
+  --primary:#1456d9;--danger:#c5221f;--ok:#16833a;--warn:#b36200;
+}
+html,body{width:1280px;height:800px}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  background:linear-gradient(160deg,#eef3fb 0%,#e6ecf6 100%);
+  color:var(--ink);overflow:hidden;
+}
+.stage{width:1280px;height:800px;display:flex;align-items:center;
+  justify-content:space-between;padding:0 96px;position:relative}
+/* 左侧文案 */
+.copy{max-width:520px}
+.copy h2{font-size:52px;line-height:1.18;font-weight:800;letter-spacing:-1px}
+.copy p{font-size:22px;line-height:1.55;color:#46566e;margin-top:22px}
+.badges{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap}
+.badge{font-size:16px;font-weight:700;padding:9px 16px;border-radius:999px;
+  background:#fff;border:1px solid var(--line);color:#34465f}
+.badge.blue{color:var(--primary);border-color:#bcd0f3}
+.badge.green{color:var(--ok);border-color:#bfe3c9}
+/* 浏览器窗口 mockup 容器 */
+.window{width:430px;background:#fff;border-radius:16px;
+  box-shadow:0 30px 70px rgba(22,40,80,.20);overflow:hidden;border:1px solid #e3e9f2}
+.winbar{height:46px;background:#f1f4f9;display:flex;align-items:center;
+  padding:0 16px;gap:8px;border-bottom:1px solid #e3e9f2}
+.dot{width:11px;height:11px;border-radius:50%}
+.dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+.url{flex:1;margin-left:14px;height:26px;background:#fff;border:1px solid #e0e6ef;
+  border-radius:7px;display:flex;align-items:center;padding:0 12px;
+  font-size:13px;color:#7a889c}
+/* ---- 真实 popup（放大 1.18x 以便商店展示） ---- */
+.popwrap{padding:26px;display:flex;justify-content:center;background:var(--bg)}
+.popup{width:350px;padding:14px;background:var(--bg);font-size:14px;
+  transform:scale(1.18);transform-origin:top center}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:12px;margin-bottom:12px}
+.brand{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.status-dot{width:10px;height:10px;border-radius:999px;background:var(--muted);margin-top:7px}
+.status-dot.recording{background:var(--danger);box-shadow:0 0 0 4px rgba(197,34,31,.12)}
+.status-dot.paused{background:var(--warn);box-shadow:0 0 0 4px rgba(179,98,0,.12)}
+.status-dot.ready{background:var(--ok)}
+.popup h1{font-size:18px;line-height:1.25;font-weight:700}
+#statusText{color:var(--muted);margin-top:3px;line-height:1.4;font-size:14px}
+.timer{min-width:64px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;
+  background:var(--panel);font-variant-numeric:tabular-nums;text-align:center}
+.info-panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+.info-row{display:grid;grid-template-columns:82px minmax(0,1fr);gap:10px;
+  padding:10px 12px;border-bottom:1px solid var(--line)}
+.info-row:last-child{border-bottom:0}
+.info-row span{color:var(--muted)}
+.info-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.setting-row{display:flex;align-items:center;justify-content:space-between;
+  margin-top:10px;padding:0 2px;font-size:13px;color:var(--muted)}
+.toggle{position:relative;width:36px;height:20px;flex:0 0 auto}
+.toggle-track{position:absolute;inset:0;background:var(--line);border-radius:10px}
+.toggle-track::before{content:'';position:absolute;width:16px;height:16px;left:2px;bottom:2px;
+  background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.toggle.on .toggle-track{background:var(--primary)}
+.toggle.on .toggle-track::before{transform:translateX(16px)}
+.actions{display:grid;gap:8px;margin-top:12px}
+.btn{width:100%;min-height:40px;border:0;border-radius:8px;background:var(--primary);
+  color:#fff;font:inherit;font-weight:700;display:flex;align-items:center;justify-content:center}
+.btn.danger{background:var(--danger)}
+.btn.secondary{background:#4f627a}
+.btn.success{background:var(--ok)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);
+  font-weight:600;min-height:34px}
+.btn.dis{opacity:.55}
+.message{min-height:20px;margin-top:10px;color:var(--muted);line-height:1.45;font-size:13px}
+.message.warning{color:var(--warn)}
+.message.ok{color:var(--ok)}
+</style></head><body>
+<div class="stage"><div class="copy"><h2>随时暂停，<br>随时继续</h2>
+       <p>中途想停一下？暂停后再继续，录音会接着写入同一个文件。</p>
+       <div class="badges"><span class="badge">暂停 / 继续</span>
+       <span class="badge">快捷键 Alt+Shift+8</span></div></div>
+<div class="window">
+  <div class="winbar"><span class="dot r"></span><span class="dot y"></span>
+    <span class="dot g"></span><div class="url">video.example.com/lecture</div></div>
+  <div class="popwrap"><div class="popup">
+    <header class="topbar">
+      <div class="brand">
+        <span class="status-dot paused"></span>
+        <div><h1>标签页录音</h1><p id="statusText">已暂停</p></div>
+      </div>
+      <output class="timer">08:30</output>
+    </header>
+    <section class="info-panel">
+      <div class="info-row"><span>当前标签页</span><strong>直播回放 · 技术分享</strong></div>
+      <div class="info-row"><span>输出格式</span><strong>WebM / Opus</strong></div>
+      <div class="info-row"><span>保存方式</span><strong>手动导出</strong></div>
+      <div class="info-row"><span>文件状态</span><strong>录制中</strong></div>
+    </section>
+    <div class="setting-row"><span>标签页静音时自动暂停录音</span>
+      <span class="toggle on"><span class="toggle-track"></span></span></div>
+    <div class="actions">
+      <div class="btn dis">开始录制当前标签页</div><div class="btn secondary">继续录制</div><div class="btn danger">停止录制</div><div class="btn success dis">导出录音文件</div>
+      <div class="btn ghost">重置</div>
+    </div>
+    <p class="message warning">已暂停，点「继续录制」接着录。</p>
+  </div></div>
+</div></div>
+</body></html>

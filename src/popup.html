@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>标签页录音</title>
+    <title data-i18n="popupHeading">标签页录音</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
@@ -12,34 +12,34 @@
         <div class="brand">
           <span class="status-dot" id="statusDot" aria-hidden="true"></span>
           <div>
-            <h1>标签页录音</h1>
-            <p id="statusText">正在读取状态</p>
+            <h1 data-i18n="popupHeading">标签页录音</h1>
+            <p id="statusText" data-i18n="statusReading">正在读取状态</p>
           </div>
         </div>
         <output class="timer" id="timer">00:00</output>
       </header>
 
-      <section class="info-panel" aria-label="录音信息">
+      <section class="info-panel" aria-label="录音信息" data-i18n-aria="ariaRecordingInfo">
         <div class="info-row">
-          <span>当前标签页</span>
+          <span data-i18n="labelCurrentTab">当前标签页</span>
           <strong id="tabTitle">-</strong>
         </div>
         <div class="info-row">
-          <span>输出格式</span>
+          <span data-i18n="labelFormat">输出格式</span>
           <strong id="formatText">WebM / Opus</strong>
         </div>
         <div class="info-row">
-          <span>保存方式</span>
-          <strong>手动导出</strong>
+          <span data-i18n="labelSaveMode">保存方式</span>
+          <strong data-i18n="valueManualExport">手动导出</strong>
         </div>
         <div class="info-row">
-          <span>文件状态</span>
-          <strong id="fileState">未生成</strong>
+          <span data-i18n="labelFileState">文件状态</span>
+          <strong id="fileState" data-i18n="fileStateNone">未生成</strong>
         </div>
       </section>
 
       <div class="setting-row">
-        <span>标签页静音时自动暂停录音</span>
+        <span data-i18n="settingAutoPause">标签页静音时自动暂停录音</span>
         <label class="toggle">
           <input type="checkbox" id="autoSyncToggle">
           <span class="toggle-track"></span>
@@ -47,11 +47,11 @@
       </div>
 
       <div class="actions">
-        <button id="startButton" type="button">开始录制当前标签页</button>
-        <button id="pauseButton" class="secondary" type="button" disabled>暂停录制</button>
-        <button id="stopButton" class="danger" type="button" disabled>停止录制</button>
-        <button id="exportButton" class="success" type="button" disabled>导出录音文件</button>
-        <button id="resetButton" class="ghost" type="button">重置</button>
+        <button id="startButton" type="button" data-i18n="btnStart">开始录制当前标签页</button>
+        <button id="pauseButton" class="secondary" type="button" disabled data-i18n="btnPause">暂停录制</button>
+        <button id="stopButton" class="danger" type="button" disabled data-i18n="btnStop">停止录制</button>
+        <button id="exportButton" class="success" type="button" disabled data-i18n="btnExport">导出录音文件</button>
+        <button id="resetButton" class="ghost" type="button" data-i18n="btnReset">重置</button>
       </div>
 
       <p class="message" id="message" role="status" aria-live="polite"></p>

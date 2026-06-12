@@ -1,0 +1,123 @@
+{
+  "extName": { "message": "Tab Audio Recorder" },
+  "extDescription": { "message": "Record the current tab's audio locally as a WebM/Opus file. No uploads, no microphone, no tracking." },
+  "actionTitle": { "message": "Record this tab's audio" },
+  "cmdToggleRecording": { "message": "Start / stop recording the current tab's audio" },
+  "cmdTogglePause": { "message": "Pause / resume recording" },
+
+  "popupHeading": { "message": "Tab Audio Recorder" },
+  "ariaRecordingInfo": { "message": "Recording info" },
+  "statusReading": { "message": "Reading status…" },
+  "labelCurrentTab": { "message": "Current tab" },
+  "labelFormat": { "message": "Output format" },
+  "labelSaveMode": { "message": "Save mode" },
+  "valueManualExport": { "message": "Manual export" },
+  "labelFileState": { "message": "File state" },
+  "settingAutoPause": { "message": "Auto-pause recording when the tab is muted" },
+  "btnStart": { "message": "Record this tab" },
+  "btnPause": { "message": "Pause" },
+  "btnStop": { "message": "Stop" },
+  "btnExport": { "message": "Export recording" },
+  "btnReset": { "message": "Reset" },
+  "btnResume": { "message": "Resume" },
+
+  "statusRecording": { "message": "Recording" },
+  "statusPaused": { "message": "Paused" },
+  "statusAutoPaused": { "message": "Auto-paused" },
+  "statusReadyToExport": { "message": "Ready to export" },
+  "statusExporting": { "message": "Exporting" },
+  "statusStopping": { "message": "Stopping" },
+  "statusIdle": { "message": "Idle" },
+
+  "fileStateNone": { "message": "Not created" },
+  "fileStateBuffered": {
+    "message": "Buffered $size$",
+    "placeholders": { "size": { "content": "$1" } }
+  },
+  "fileStateReadySized": {
+    "message": "Ready $size$",
+    "placeholders": { "size": { "content": "$1" } }
+  },
+
+  "msgStarting": { "message": "Starting recording…" },
+  "msgStarted": { "message": "Recording started. Closing the popup won't stop it." },
+  "msgResuming": { "message": "Resuming recording…" },
+  "msgPausing": { "message": "Pausing recording…" },
+  "msgResumed": { "message": "Recording resumed." },
+  "msgPaused": { "message": "Recording paused. The page keeps playing audio." },
+  "msgStopping": { "message": "Stopping recording…" },
+  "msgRecordingSaved": {
+    "message": "Recording ready: $file$",
+    "placeholders": { "file": { "content": "$1" } }
+  },
+  "msgExporting": { "message": "Exporting recording file…" },
+  "msgSentToDownloads": {
+    "message": "Sent to browser downloads: $file$",
+    "placeholders": { "file": { "content": "$1" } }
+  },
+  "msgNothingToExport": { "message": "No recording file to export." },
+  "confirmResetDefault": { "message": "Reset? This clears all state and returns to idle." },
+  "confirmResetRecording": { "message": "Recording is in progress. Resetting will stop and discard it. Continue?" },
+  "confirmResetReady": { "message": "Discard this recording that hasn't been exported yet? This cannot be undone." },
+  "msgResetting": { "message": "Resetting…" },
+  "msgResetDone": { "message": "Reset done. You can start a new recording." },
+  "errNoBackendResponse": { "message": "The extension background did not return a valid response." },
+
+  "notifyStoppedTitle": { "message": "Recording stopped" },
+  "notifyStoppedSaved": {
+    "message": "Ready: $file$. Open the extension to export.",
+    "placeholders": { "file": { "content": "$1" } }
+  },
+  "notifyStoppedOpen": { "message": "Open the extension to see the status." },
+  "notifyStartTitle": { "message": "Recording started" },
+  "notifyStartBody": { "message": "Recording the current tab's audio." },
+  "notifyCantStartTitle": { "message": "Couldn't start recording" },
+  "notifyCantStartBody": { "message": "Open the extension for details." },
+  "notifyReadyPendingTitle": { "message": "A recording is waiting to export" },
+  "notifyReadyPendingBody": { "message": "Export or discard it before starting a new recording." },
+  "notifyPausedTitle": { "message": "Recording paused" },
+  "notifyPausedBody": { "message": "The page keeps playing. Press the shortcut again to resume." },
+  "notifyResumedTitle": { "message": "Recording resumed" },
+  "notifyResumedBody": { "message": "Continuing to write tab audio to the file." },
+  "notifyActionFailedTitle": { "message": "Action failed" },
+
+  "errUnknownCommand": { "message": "Unknown command." },
+  "noticeAutoStopped": { "message": "The recording target ended (tab closed or audio stream interrupted). The recording was saved automatically — please export it." },
+  "errOffscreenStopFailed": { "message": "The offscreen document failed to stop recording." },
+  "errAlreadyRecording": { "message": "A recording is already in progress." },
+  "errReadyPending": { "message": "A recording is waiting to export. Export it before starting a new one." },
+  "errTabMuted": { "message": "The current tab is muted. Unmute it before recording." },
+  "errStartFailed": { "message": "Failed to start recording." },
+  "warnTabSilent": { "message": "No audio detected on this tab yet. Recording will continue once it starts playing." },
+  "errNoActiveContent": { "message": "Nothing is being recorded right now." },
+  "errPauseFailed": { "message": "Failed to pause recording." },
+  "errNotPaused": { "message": "The recording is not currently paused." },
+  "errResumeFailed": { "message": "Failed to resume recording." },
+  "msgStoppingNow": { "message": "Stopping the recording." },
+  "msgNoOngoingRecording": { "message": "There is no recording in progress." },
+  "errStopNotReceived": { "message": "The recorder did not receive the stop request. Reopen the extension and try again." },
+  "errStoppedNoFile": { "message": "Recording stopped, but no downloadable file was produced." },
+  "errNothingToExportYet": { "message": "No recording file to export. Finish a recording first." },
+  "errResetByUser": { "message": "Reset by the user." },
+  "errStopTimeout": { "message": "Timed out waiting for the recording file. Check the service worker / offscreen error logs on the extension details page." },
+  "errNoActiveTab": { "message": "Couldn't find the active tab." },
+  "errBlockedPage": { "message": "Browser-internal or extension pages can't be recorded. Switch to a video/livestream page first." },
+  "errMissingDownloadInfo": { "message": "The recording result is missing download information." },
+  "errFallbackDownloadFailed": { "message": "The fallback download also failed." },
+  "errDownloadFailed": {
+    "message": "Browser download failed: $primary$; fallback download failed: $fallback$",
+    "placeholders": {
+      "primary": { "content": "$1" },
+      "fallback": { "content": "$2" }
+    }
+  },
+  "errCannotAccessPage": { "message": "This page can't be accessed by the extension. Switch to a normal web page and try again." },
+  "errCannotCapture": { "message": "Couldn't capture this tab's audio. Make sure you started from a video/livestream page and that the browser allows tab capture." },
+  "errNeedUserGesture": { "message": "Start recording from the extension popup — the browser requires recording to be triggered by a user action." },
+
+  "errOffscreenUnknownCommand": { "message": "The offscreen document received an unknown command." },
+  "errAlreadyRecordingInProgress": { "message": "A recording is already in progress." },
+  "errNoDataToSave": { "message": "Recording already stopped; no recording data was found to save." },
+  "errMediaRecorder": { "message": "MediaRecorder error." },
+  "errDownloadUrlExpired": { "message": "The recording download URL has expired." }
+}

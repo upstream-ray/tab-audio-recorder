@@ -1,0 +1,123 @@
+{
+  "extName": { "message": "标签页录音" },
+  "extDescription": { "message": "一键录制当前标签页音频，本地保存为 WebM/Opus，不上传、不录麦克风。" },
+  "actionTitle": { "message": "录制当前标签页音频" },
+  "cmdToggleRecording": { "message": "开始 / 停止录制当前标签页音频" },
+  "cmdTogglePause": { "message": "暂停 / 继续录音" },
+
+  "popupHeading": { "message": "标签页录音" },
+  "ariaRecordingInfo": { "message": "录音信息" },
+  "statusReading": { "message": "正在读取状态" },
+  "labelCurrentTab": { "message": "当前标签页" },
+  "labelFormat": { "message": "输出格式" },
+  "labelSaveMode": { "message": "保存方式" },
+  "valueManualExport": { "message": "手动导出" },
+  "labelFileState": { "message": "文件状态" },
+  "settingAutoPause": { "message": "标签页静音时自动暂停录音" },
+  "btnStart": { "message": "开始录制当前标签页" },
+  "btnPause": { "message": "暂停录制" },
+  "btnStop": { "message": "停止录制" },
+  "btnExport": { "message": "导出录音文件" },
+  "btnReset": { "message": "重置" },
+  "btnResume": { "message": "继续录制" },
+
+  "statusRecording": { "message": "录制中" },
+  "statusPaused": { "message": "已暂停" },
+  "statusAutoPaused": { "message": "已自动暂停" },
+  "statusReadyToExport": { "message": "待导出" },
+  "statusExporting": { "message": "正在导出" },
+  "statusStopping": { "message": "正在停止" },
+  "statusIdle": { "message": "待机" },
+
+  "fileStateNone": { "message": "未生成" },
+  "fileStateBuffered": {
+    "message": "缓存 $size$",
+    "placeholders": { "size": { "content": "$1" } }
+  },
+  "fileStateReadySized": {
+    "message": "待导出 $size$",
+    "placeholders": { "size": { "content": "$1" } }
+  },
+
+  "msgStarting": { "message": "正在启动录音..." },
+  "msgStarted": { "message": "录音已开始。关闭弹窗不会中断录音。" },
+  "msgResuming": { "message": "正在继续录音..." },
+  "msgPausing": { "message": "正在暂停录音..." },
+  "msgResumed": { "message": "已继续录音。" },
+  "msgPaused": { "message": "录音已暂停，页面声音仍会继续播放。" },
+  "msgStopping": { "message": "正在停止录音..." },
+  "msgRecordingSaved": {
+    "message": "录音已生成：$file$",
+    "placeholders": { "file": { "content": "$1" } }
+  },
+  "msgExporting": { "message": "正在导出录音文件..." },
+  "msgSentToDownloads": {
+    "message": "已发送到浏览器下载：$file$",
+    "placeholders": { "file": { "content": "$1" } }
+  },
+  "msgNothingToExport": { "message": "没有可导出的录音文件。" },
+  "confirmResetDefault": { "message": "确定要重置吗？将清理所有状态，回到待机。" },
+  "confirmResetRecording": { "message": "当前正在录制，重置会停止并丢弃这段录音。确定继续吗？" },
+  "confirmResetReady": { "message": "确定要丢弃这段尚未导出的录音吗？此操作无法撤销。" },
+  "msgResetting": { "message": "正在重置..." },
+  "msgResetDone": { "message": "已重置，可以开始新的录制。" },
+  "errNoBackendResponse": { "message": "插件后台没有返回有效响应。" },
+
+  "notifyStoppedTitle": { "message": "录音已停止" },
+  "notifyStoppedSaved": {
+    "message": "已生成：$file$，请打开扩展导出。",
+    "placeholders": { "file": { "content": "$1" } }
+  },
+  "notifyStoppedOpen": { "message": "请打开扩展查看状态。" },
+  "notifyStartTitle": { "message": "开始录制" },
+  "notifyStartBody": { "message": "正在录制当前标签页音频。" },
+  "notifyCantStartTitle": { "message": "无法开始录制" },
+  "notifyCantStartBody": { "message": "请打开扩展查看详情。" },
+  "notifyReadyPendingTitle": { "message": "有待导出录音" },
+  "notifyReadyPendingBody": { "message": "请打开扩展导出或丢弃后再开始新的录制。" },
+  "notifyPausedTitle": { "message": "录音已暂停" },
+  "notifyPausedBody": { "message": "页面声音仍在播放，可再次按快捷键继续。" },
+  "notifyResumedTitle": { "message": "录音已继续" },
+  "notifyResumedBody": { "message": "继续把标签页音频写入文件。" },
+  "notifyActionFailedTitle": { "message": "操作失败" },
+
+  "errUnknownCommand": { "message": "未知指令。" },
+  "noticeAutoStopped": { "message": "录制目标已结束（标签页关闭或音频流中断），录音已自动保存，请导出。" },
+  "errOffscreenStopFailed": { "message": "offscreen 停止录音失败。" },
+  "errAlreadyRecording": { "message": "已经有录音正在进行。" },
+  "errReadyPending": { "message": "已有一段录音待导出。请先导出后再开始新的录音。" },
+  "errTabMuted": { "message": "当前标签页处于静音状态。请先取消静音，再开始录制。" },
+  "errStartFailed": { "message": "启动录音失败。" },
+  "warnTabSilent": { "message": "当前标签页暂未检测到声音，开始播放后会继续录制。" },
+  "errNoActiveContent": { "message": "当前没有正在录制的内容。" },
+  "errPauseFailed": { "message": "暂停录音失败。" },
+  "errNotPaused": { "message": "当前录音没有处于暂停状态。" },
+  "errResumeFailed": { "message": "继续录音失败。" },
+  "msgStoppingNow": { "message": "正在停止录音。" },
+  "msgNoOngoingRecording": { "message": "当前没有正在进行的录音。" },
+  "errStopNotReceived": { "message": "录音后台没有接收停止请求。请重新打开扩展后再试。" },
+  "errStoppedNoFile": { "message": "录音已停止，但没有生成可下载文件。" },
+  "errNothingToExportYet": { "message": "没有可导出的录音文件。请先完成一次录音。" },
+  "errResetByUser": { "message": "已被用户重置。" },
+  "errStopTimeout": { "message": "等待录音文件生成超时。请在扩展详情页查看 service worker/offscreen 错误日志。" },
+  "errNoActiveTab": { "message": "没有找到当前活动标签页。" },
+  "errBlockedPage": { "message": "浏览器内置页面或扩展页面不能被录制。请切换到视频/直播网页后再开始。" },
+  "errMissingDownloadInfo": { "message": "录音结果缺少下载信息。" },
+  "errFallbackDownloadFailed": { "message": "兜底下载也没有成功。" },
+  "errDownloadFailed": {
+    "message": "浏览器下载失败：$primary$；兜底下载失败：$fallback$",
+    "placeholders": {
+      "primary": { "content": "$1" },
+      "fallback": { "content": "$2" }
+    }
+  },
+  "errCannotAccessPage": { "message": "当前页面不能被扩展访问，请换到普通网页后再试。" },
+  "errCannotCapture": { "message": "无法捕获当前标签页音频。请确认已在视频/直播网页中点击开始，且浏览器允许标签页捕获。" },
+  "errNeedUserGesture": { "message": "请从插件弹窗里点击开始录制，浏览器要求录音必须由用户主动触发。" },
+
+  "errOffscreenUnknownCommand": { "message": "offscreen 收到未知指令。" },
+  "errAlreadyRecordingInProgress": { "message": "录音已经在进行中。" },
+  "errNoDataToSave": { "message": "录音已经停止，未找到可保存的录音数据。" },
+  "errMediaRecorder": { "message": "MediaRecorder 出错。" },
+  "errDownloadUrlExpired": { "message": "录音下载地址已经失效。" }
+}

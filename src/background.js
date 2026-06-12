@@ -14,6 +14,21 @@ let activeRecordingTabId = null;
 let autoPaused = false;
 let autoSyncEnabled = true;
 
+chrome.storage.session.get(['autoPaused', 'activeRecordingTabId'], (result) => {
+  if (result.autoPaused !== undefined) autoPaused = result.autoPaused;
+  if (result.activeRecordingTabId !== undefined) activeRecordingTabId = result.activeRecordingTabId;
+});
+
+function setAutoPaused(value) {
+  autoPaused = value;
+  chrome.storage.session.set({ autoPaused: value });
+}
+
+function setActiveRecordingTabId(value) {
+  activeRecordingTabId = value;
+  chrome.storage.session.set({ activeRecordingTabId: value });
+}
+
 chrome.storage.local.get('autoSyncEnabled', (result) => {
   if (result.autoSyncEnabled !== undefined) {
     autoSyncEnabled = result.autoSyncEnabled;
@@ -67,7 +82,7 @@ async function handleCommand(command) {
         await pauseRecording();
         await notifyUser('录音已暂停', '页面声音仍在播放，可再次按快捷键继续。');
       } else if (status.state === 'paused') {
-        autoPaused = false;
+        setAutoPaused(false);
         await resumeRecording();
         await notifyUser('录音已继续', '继续把标签页音频写入文件。');
       }
@@ -98,14 +113,14 @@ async function handleTabAudibleChange(audible) {
   try {
     const status = await getStatus();
     if (!audible && status.state === 'recording') {
-      autoPaused = true;
+      setAutoPaused(true);
       try {
         await pauseRecording();
       } catch (error) {
-        autoPaused = false;
+        setAutoPaused(false);
       }
     } else if (audible && autoPaused && status.state === 'paused') {
-      autoPaused = false;
+      setAutoPaused(false);
       await resumeRecording();
     }
   } catch (error) {
@@ -117,11 +132,11 @@ async function handleStreamSilence() {
   try {
     const status = await getStatus();
     if (status.state === 'recording') {
-      autoPaused = true;
+      setAutoPaused(true);
       try {
         await pauseRecording();
       } catch (error) {
-        autoPaused = false;
+        setAutoPaused(false);
       }
     }
   } catch (error) {
@@ -134,7 +149,7 @@ async function handleStreamResumed() {
     if (!autoPaused) return;
     const status = await getStatus();
     if (status.state === 'paused') {
-      autoPaused = false;
+      setAutoPaused(false);
       await resumeRecording();
     }
   } catch (error) {
@@ -171,7 +186,7 @@ async function handleMessage(message) {
       return pauseRecording();
 
     case 'RESUME_RECORDING':
-      autoPaused = false;
+      setAutoPaused(false);
       return resumeRecording();
 
     case 'STOP_RECORDING':
@@ -189,8 +204,8 @@ async function handleMessage(message) {
       return { ok: true };
 
     case 'OFFSCREEN_AUTO_STOPPED': {
-      activeRecordingTabId = null;
-      autoPaused = false;
+      setActiveRecordingTabId(null);
+      setAutoPaused(false);
       readyRecording = message.recording;
       const readyStatus = buildReadyStatus(message.recording);
       const notice = {
@@ -235,7 +250,7 @@ async function handleMessage(message) {
     case 'SET_AUTO_SYNC':
       autoSyncEnabled = !!message.enabled;
       chrome.storage.local.set({ autoSyncEnabled });
-      if (!autoSyncEnabled) autoPaused = false;
+      if (!autoSyncEnabled) setAutoPaused(false);
       return { ok: true, autoSyncEnabled };
 
     default:
@@ -286,7 +301,7 @@ async function startRecording() {
   }
 
   readyRecording = null;
-  activeRecordingTabId = tab.id;
+  setActiveRecordingTabId(tab.id);
   await setStatusBadge(response.status);
   await broadcastStatus(response.status);
 
@@ -371,8 +386,8 @@ async function stopRecording() {
 
   const response = await stopResult;
 
-  activeRecordingTabId = null;
-  autoPaused = false;
+  setActiveRecordingTabId(null);
+  setAutoPaused(false);
 
   if (!response.recording?.objectUrl) {
     throw new Error('录音已停止，但没有生成可下载文件。');
@@ -428,8 +443,8 @@ async function exportRecording() {
 }
 
 async function resetAll() {
-  activeRecordingTabId = null;
-  autoPaused = false;
+  setActiveRecordingTabId(null);
+  setAutoPaused(false);
 
   for (const requestId of Array.from(pendingStopRequests.keys())) {
     rejectPendingStopRequest(requestId, new Error('已被用户重置。'));
@@ -575,7 +590,7 @@ async function getStatus() {
       }
 
       if (['recording', 'paused'].includes(response.status?.state) && response.status?.tabId) {
-        activeRecordingTabId = response.status.tabId;
+        setActiveRecordingTabId(response.status.tabId);
       }
 
       const status = stripPrivateStatus(response.status);

@@ -21,7 +21,7 @@ const objectUrls = new Set();
 
 const SILENCE_THRESHOLD = 0.01;
 const SILENCE_CHECK_INTERVAL_MS = 500;
-const SILENCE_CHECKS_BEFORE_PAUSE = 3;
+const SILENCE_CHECKS_BEFORE_PAUSE = 10;
 let silenceCheckInterval;
 let consecutiveSilentChecks = 0;
 let isSilent = false;
@@ -342,6 +342,11 @@ function stopSilenceDetection() {
 
 function checkSilence() {
   if (!analyserNode || !recorder || recorder.state === 'inactive') {
+    return;
+  }
+
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume().catch(() => {});
     return;
   }
 

@@ -113,6 +113,35 @@ async function handleTabAudibleChange(audible) {
   }
 }
 
+async function handleStreamSilence() {
+  try {
+    const status = await getStatus();
+    if (status.state === 'recording') {
+      autoPaused = true;
+      try {
+        await pauseRecording();
+      } catch (error) {
+        autoPaused = false;
+      }
+    }
+  } catch (error) {
+    // Don't disrupt recording for monitoring errors.
+  }
+}
+
+async function handleStreamResumed() {
+  try {
+    if (!autoPaused) return;
+    const status = await getStatus();
+    if (status.state === 'paused') {
+      autoPaused = false;
+      await resumeRecording();
+    }
+  } catch (error) {
+    // Don't disrupt recording for monitoring errors.
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target && message.target !== 'background') {
     return false;
@@ -186,6 +215,18 @@ async function handleMessage(message) {
         message.requestId,
         new Error(message.error || 'offscreen 停止录音失败。')
       );
+      return { ok: true };
+
+    case 'OFFSCREEN_AUDIO_SILENCE':
+      if (autoSyncEnabled) {
+        await handleStreamSilence();
+      }
+      return { ok: true };
+
+    case 'OFFSCREEN_AUDIO_RESUMED':
+      if (autoSyncEnabled) {
+        await handleStreamResumed();
+      }
       return { ok: true };
 
     case 'GET_AUTO_SYNC':

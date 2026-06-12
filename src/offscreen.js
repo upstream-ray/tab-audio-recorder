@@ -8,6 +8,7 @@ let recorder;
 let mediaStream;
 let audioContext;
 let audioSource;
+let analyserNode;
 let chunks = [];
 let totalBytes = 0;
 let selectedMimeType = '';
@@ -17,6 +18,13 @@ let stoppingPromise;
 let recordedDurationMs = 0;
 let recordingRunStartedAt = 0;
 const objectUrls = new Set();
+
+const SILENCE_THRESHOLD = 0.01;
+const SILENCE_CHECK_INTERVAL_MS = 500;
+const SILENCE_CHECKS_BEFORE_PAUSE = 3;
+let silenceCheckInterval;
+let consecutiveSilentChecks = 0;
+let isSilent = false;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target !== 'offscreen') {
@@ -272,6 +280,11 @@ function keepCapturedAudioAudible(stream) {
   audioSource = audioContext.createMediaStreamSource(stream);
   audioSource.connect(audioContext.destination);
 
+  analyserNode = audioContext.createAnalyser();
+  analyserNode.fftSize = 2048;
+  audioSource.connect(analyserNode);
+  startSilenceDetection();
+
   if (audioContext.state === 'suspended') {
     audioContext.resume().catch(() => {});
   }
@@ -288,6 +301,13 @@ function attachUnexpectedEndHandlers(stream) {
 }
 
 async function cleanupMedia() {
+  stopSilenceDetection();
+
+  if (analyserNode) {
+    analyserNode.disconnect();
+    analyserNode = undefined;
+  }
+
   if (audioSource) {
     audioSource.disconnect();
     audioSource = undefined;
@@ -301,6 +321,61 @@ async function cleanupMedia() {
   if (mediaStream) {
     mediaStream.getTracks().forEach((track) => track.stop());
     mediaStream = undefined;
+  }
+}
+
+function startSilenceDetection() {
+  if (silenceCheckInterval) return;
+  consecutiveSilentChecks = 0;
+  isSilent = false;
+  silenceCheckInterval = setInterval(checkSilence, SILENCE_CHECK_INTERVAL_MS);
+}
+
+function stopSilenceDetection() {
+  if (silenceCheckInterval) {
+    clearInterval(silenceCheckInterval);
+    silenceCheckInterval = null;
+  }
+  consecutiveSilentChecks = 0;
+  isSilent = false;
+}
+
+function checkSilence() {
+  if (!analyserNode || !recorder || recorder.state === 'inactive') {
+    return;
+  }
+
+  const dataArray = new Float32Array(analyserNode.fftSize);
+  analyserNode.getFloatTimeDomainData(dataArray);
+
+  let peak = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    const abs = Math.abs(dataArray[i]);
+    if (abs > peak) peak = abs;
+  }
+
+  const nowSilent = peak < SILENCE_THRESHOLD;
+
+  if (nowSilent) {
+    consecutiveSilentChecks++;
+  } else {
+    consecutiveSilentChecks = 0;
+  }
+
+  const detectedSilent = consecutiveSilentChecks >= SILENCE_CHECKS_BEFORE_PAUSE;
+
+  if (detectedSilent && !isSilent) {
+    isSilent = true;
+    chrome.runtime.sendMessage({
+      target: 'background',
+      type: 'OFFSCREEN_AUDIO_SILENCE'
+    }).catch(() => {});
+  } else if (!nowSilent && isSilent) {
+    isSilent = false;
+    chrome.runtime.sendMessage({
+      target: 'background',
+      type: 'OFFSCREEN_AUDIO_RESUMED'
+    }).catch(() => {});
   }
 }
 

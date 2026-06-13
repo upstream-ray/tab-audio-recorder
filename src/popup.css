@@ -251,6 +251,29 @@ button.ghost:hover:not(:disabled) {
   border-color: var(--danger);
 }
 
+.lang-switch {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.lang-switch button {
+  width: auto;
+  min-height: 26px;
+  padding: 3px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lang-switch button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 .message {
   min-height: 20px;
   margin-top: 10px;

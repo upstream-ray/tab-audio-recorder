@@ -1,0 +1,83 @@
+// 运行时多语言加载器。
+//
+// chrome.i18n.getMessage() 只能跟随浏览器界面语言、无法在运行时切换，
+// 因此这里以 _locales/<lang>/messages.json 为唯一数据源（fetch 加载），
+// 由 chrome.storage.local 里的 uiLang 偏好决定当前语言，可随时切换。
+// popup / background / offscreen 三处共用本模块，保证界面、通知、错误一致。
+(function () {
+  const SUPPORTED = ['en', 'zh_CN'];
+  const FALLBACK = 'en';
+  const tables = {}; // lang -> 原始 messages.json 对象
+  let current = guessFromBrowser();
+
+  function guessFromBrowser() {
+    const ui = (chrome.i18n.getUILanguage() || '').toLowerCase();
+    return ui.startsWith('zh') ? 'zh_CN' : 'en';
+  }
+
+  async function loadTable(lang) {
+    if (tables[lang]) return;
+    const url = chrome.runtime.getURL('_locales/' + lang + '/messages.json');
+    const res = await fetch(url);
+    tables[lang] = await res.json();
+  }
+
+  // 把 messages.json 的 { message, placeholders } 渲染成最终文案。
+  // 占位符形如 "$file$"，其 content "$1" 指向 subs[0]。
+  function format(entry, subs) {
+    if (!entry) return '';
+    let msg = entry.message;
+    if (entry.placeholders) {
+      for (const name in entry.placeholders) {
+        const ref = entry.placeholders[name].content || '';
+        const idx = parseInt(ref.replace(/[^0-9]/g, ''), 10) - 1;
+        const val = subs && subs[idx] != null ? String(subs[idx]) : '';
+        msg = msg.split('$' + name + '$').join(val);
+      }
+    }
+    return msg;
+  }
+
+  function t(key, subs) {
+    const table = tables[current] || {};
+    const fallback = tables[FALLBACK] || {};
+    return format(table[key] || fallback[key], subs);
+  }
+
+  const ready = (async () => {
+    try {
+      const { uiLang } = await chrome.storage.local.get('uiLang');
+      if (uiLang && SUPPORTED.includes(uiLang)) current = uiLang;
+    } catch (error) {
+      // storage 不可用时退回浏览器语言推断。
+    }
+    await loadTable(current);
+    if (current !== FALLBACK) await loadTable(FALLBACK);
+  })();
+
+  async function setLang(lang) {
+    if (!SUPPORTED.includes(lang) || lang === current) return;
+    await loadTable(lang);
+    current = lang;
+    try {
+      await chrome.storage.local.set({ uiLang: lang });
+    } catch (error) {
+      // 偏好持久化失败不影响本次切换。
+    }
+  }
+
+  function bcp47() {
+    return current === 'zh_CN' ? 'zh-CN' : 'en';
+  }
+
+  globalThis.I18N = {
+    t,
+    ready,
+    setLang,
+    bcp47,
+    SUPPORTED,
+    get lang() {
+      return current;
+    }
+  };
+})();

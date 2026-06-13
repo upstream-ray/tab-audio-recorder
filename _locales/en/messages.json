@@ -14,6 +14,7 @@
   "valueManualExport": { "message": "Manual export" },
   "labelFileState": { "message": "File state" },
   "settingAutoPause": { "message": "Auto-pause recording when the tab is muted" },
+  "settingLanguage": { "message": "Language" },
   "btnStart": { "message": "Record this tab" },
   "btnPause": { "message": "Pause" },
   "btnStop": { "message": "Stop" },

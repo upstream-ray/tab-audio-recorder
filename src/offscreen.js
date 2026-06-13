@@ -1,4 +1,4 @@
-const t = (key, subs) => chrome.i18n.getMessage(key, subs);
+const t = (key, subs) => I18N.t(key, subs);
 
 const MIME_TYPE_CANDIDATES = [
   'audio/webm; codecs=opus',
@@ -43,6 +43,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleMessage(message) {
+  await I18N.ready;
   switch (message.type) {
     case 'GET_STATUS':
       return {

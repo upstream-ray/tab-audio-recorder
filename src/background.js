@@ -1,4 +1,6 @@
-const t = (key, subs) => chrome.i18n.getMessage(key, subs);
+importScripts(chrome.runtime.getURL('src/i18n.js'));
+
+const t = (key, subs) => I18N.t(key, subs);
 
 const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen.html';
 const OFFSCREEN_DOCUMENT_URL = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
@@ -57,6 +59,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 async function handleCommand(command) {
+  await I18N.ready;
   try {
     if (command === 'toggle-recording') {
       const status = await getStatus();
@@ -174,6 +177,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleMessage(message) {
+  await I18N.ready;
   switch (message?.type) {
     case 'GET_STATUS': {
       const status = await getStatus();

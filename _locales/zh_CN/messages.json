@@ -14,6 +14,7 @@
   "valueManualExport": { "message": "手动导出" },
   "labelFileState": { "message": "文件状态" },
   "settingAutoPause": { "message": "标签页静音时自动暂停录音" },
+  "settingLanguage": { "message": "界面语言" },
   "btnStart": { "message": "开始录制当前标签页" },
   "btnPause": { "message": "暂停录制" },
   "btnStop": { "message": "停止录制" },

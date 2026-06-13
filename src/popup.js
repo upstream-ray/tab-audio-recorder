@@ -1,7 +1,7 @@
-const t = (key, subs) => chrome.i18n.getMessage(key, subs);
+const t = (key, subs) => I18N.t(key, subs);
 
 function localizeStatic() {
-  document.documentElement.lang = chrome.i18n.getUILanguage();
+  document.documentElement.lang = I18N.bcp47();
   for (const node of document.querySelectorAll('[data-i18n]')) {
     const message = t(node.dataset.i18n);
     if (message) {
@@ -13,6 +13,31 @@ function localizeStatic() {
     if (message) {
       node.setAttribute('aria-label', message);
     }
+  }
+}
+
+function setupLangSwitch() {
+  const buttons = document.querySelectorAll('#langSwitch [data-lang]');
+
+  const syncActive = () => {
+    for (const button of buttons) {
+      button.classList.toggle('active', button.dataset.lang === I18N.lang);
+    }
+  };
+
+  syncActive();
+
+  for (const button of buttons) {
+    button.addEventListener('click', async () => {
+      if (button.dataset.lang === I18N.lang) {
+        return;
+      }
+      await I18N.setLang(button.dataset.lang);
+      syncActive();
+      localizeStatic();
+      renderStatus(currentStatus);
+      setMessage('');
+    });
   }
 }
 
@@ -36,8 +61,10 @@ let currentStatus = { state: 'idle' };
 let statusReceivedAt = Date.now();
 let timerId;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await I18N.ready;
   localizeStatic();
+  setupLangSwitch();
 
   els.startButton.addEventListener('click', onStartClick);
   els.pauseButton.addEventListener('click', onPauseClick);

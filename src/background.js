@@ -1,4 +1,86 @@
-importScripts(chrome.runtime.getURL('src/i18n.js'));
+// i18n 加载器的内联副本。MV3 service worker 的 importScripts 加载 src/i18n.js
+// 不可靠（会导致 I18N 未定义），所以这里直接内联，保证 background 一定可用。
+// popup / offscreen 是 document 上下文，仍通过 <script src="i18n.js"> 共用同一份逻辑。
+(function () {
+  const SUPPORTED = ['en', 'zh_CN'];
+  const FALLBACK = 'en';
+  const tables = {};
+  let current = guessFromBrowser();
+
+  function guessFromBrowser() {
+    // 与 i18n.js 保持一致：chrome.i18n 在受限上下文不可用时回退默认语言。
+    try {
+      const ui = (chrome.i18n.getUILanguage() || '').toLowerCase();
+      return ui.startsWith('zh') ? 'zh_CN' : 'en';
+    } catch (error) {
+      return FALLBACK;
+    }
+  }
+
+  async function loadTable(lang) {
+    if (tables[lang]) return;
+    const url = chrome.runtime.getURL('_locales/' + lang + '/messages.json');
+    const res = await fetch(url);
+    tables[lang] = await res.json();
+  }
+
+  function format(entry, subs) {
+    if (!entry) return '';
+    let msg = entry.message;
+    if (entry.placeholders) {
+      for (const name in entry.placeholders) {
+        const ref = entry.placeholders[name].content || '';
+        const idx = parseInt(ref.replace(/[^0-9]/g, ''), 10) - 1;
+        const val = subs && subs[idx] != null ? String(subs[idx]) : '';
+        msg = msg.split('$' + name + '$').join(val);
+      }
+    }
+    return msg;
+  }
+
+  function t(key, subs) {
+    const table = tables[current] || {};
+    const fallback = tables[FALLBACK] || {};
+    return format(table[key] || fallback[key], subs);
+  }
+
+  const ready = (async () => {
+    try {
+      const { uiLang } = await chrome.storage.local.get('uiLang');
+      if (uiLang && SUPPORTED.includes(uiLang)) current = uiLang;
+    } catch (error) {
+      // storage 不可用时退回浏览器语言推断。
+    }
+    await loadTable(current);
+    if (current !== FALLBACK) await loadTable(FALLBACK);
+  })();
+
+  async function setLang(lang) {
+    if (!SUPPORTED.includes(lang) || lang === current) return;
+    await loadTable(lang);
+    current = lang;
+    try {
+      await chrome.storage.local.set({ uiLang: lang });
+    } catch (error) {
+      // 偏好持久化失败不影响本次切换。
+    }
+  }
+
+  function bcp47() {
+    return current === 'zh_CN' ? 'zh-CN' : 'en';
+  }
+
+  globalThis.I18N = {
+    t,
+    ready,
+    setLang,
+    bcp47,
+    SUPPORTED,
+    get lang() {
+      return current;
+    }
+  };
+})();
 
 const t = (key, subs) => I18N.t(key, subs);
 

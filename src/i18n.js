@@ -3,7 +3,8 @@
 // chrome.i18n.getMessage() 只能跟随浏览器界面语言、无法在运行时切换，
 // 因此这里以 _locales/<lang>/messages.json 为唯一数据源（fetch 加载），
 // 由 chrome.storage.local 里的 uiLang 偏好决定当前语言，可随时切换。
-// popup / background / offscreen 三处共用本模块，保证界面、通知、错误一致。
+// popup / offscreen 是 document 上下文，通过 <script src="i18n.js"> 共用本模块；
+// background（MV3 service worker）的 importScripts 加载不可靠，改用内联副本。
 (function () {
   const SUPPORTED = ['en', 'zh_CN'];
   const FALLBACK = 'en';
@@ -11,8 +12,13 @@
   let current = guessFromBrowser();
 
   function guessFromBrowser() {
-    const ui = (chrome.i18n.getUILanguage() || '').toLowerCase();
-    return ui.startsWith('zh') ? 'zh_CN' : 'en';
+    // chrome.i18n 在 offscreen document 里不可用，访问会抛错，需容错回退。
+    try {
+      const ui = (chrome.i18n.getUILanguage() || '').toLowerCase();
+      return ui.startsWith('zh') ? 'zh_CN' : 'en';
+    } catch (error) {
+      return FALLBACK;
+    }
   }
 
   async function loadTable(lang) {

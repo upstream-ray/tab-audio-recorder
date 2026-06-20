@@ -1,16 +1,25 @@
 :root {
   color-scheme: light;
-  --bg: #f7f9fc;
-  --panel: #ffffff;
-  --ink: #162033;
-  --muted: #607089;
-  --line: #dce3ed;
-  --primary: #1456d9;
-  --primary-hover: #0d47bd;
-  --danger: #c5221f;
-  --danger-hover: #a91612;
-  --ok: #16833a;
-  --warn: #b36200;
+  --bg: #ffffff;
+  --surface: #f5f5f7;
+  --surface-strong: #f0f0f2;
+  --ink: #1d1d1f;
+  --muted: #86868b;
+  --hairline: rgba(60, 60, 67, 0.12);
+  --primary: #0071e3;
+  --primary-hover: #0077ed;
+  --primary-tint: #eef4ff;
+  --primary-tint-hover: #e2ecfd;
+  --danger: #ff3b30;
+  --danger-tint: #ffeceb;
+  --danger-tint-hover: #ffe1df;
+  --ok: #34c759;
+  --warn: #ff9f0a;
+  --disabled-bg: #f0f0f2;
+  --disabled-ink: #c5c5c7;
+  --radius-card: 18px;
+  --radius-group: 13px;
+  --radius-btn: 12px;
 }
 
 * {
@@ -19,61 +28,69 @@
 
 body {
   margin: 0;
-  min-width: 350px;
+  min-width: 340px;
   background: var(--bg);
   color: var(--ink);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
+  -webkit-font-smoothing: antialiased;
 }
 
 .popup {
-  width: 350px;
-  padding: 14px;
+  width: 340px;
+  padding: 18px 16px;
 }
 
+/* ---------- header ---------- */
 .topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .brand {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 9px;
   min-width: 0;
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--muted);
-  margin-top: 7px;
 }
 
 .status-dot.recording {
   background: var(--danger);
-  box-shadow: 0 0 0 4px rgba(197, 34, 31, 0.12);
+  box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.16);
+  animation: dotPulse 2s ease-in-out infinite;
 }
 
 .status-dot.paused {
   background: var(--warn);
-  box-shadow: 0 0 0 4px rgba(179, 98, 0, 0.12);
+  box-shadow: 0 0 0 4px rgba(255, 159, 10, 0.16);
 }
 
 .status-dot.ready {
   background: var(--ok);
 }
 
+@keyframes dotPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.16); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.04); }
+}
+
 h1 {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.25;
-  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 p {
@@ -82,44 +99,53 @@ p {
 
 #statusText {
   color: var(--muted);
-  margin-top: 3px;
-  line-height: 1.4;
+  font-size: 12px;
+  margin-top: 1px;
+  line-height: 1.3;
 }
 
 .timer {
   flex: 0 0 auto;
-  min-width: 64px;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--ink);
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
-  text-align: center;
 }
 
+/* ---------- info panel (iOS grouped list) ---------- */
 .info-panel {
-  display: grid;
-  gap: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  background: var(--surface);
+  border-radius: var(--radius-group);
   overflow: hidden;
 }
 
 .info-row {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  font-size: 13.5px;
 }
 
-.info-row:last-child {
-  border-bottom: 0;
+.info-row:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 0;
+  height: 0.5px;
+  background: var(--hairline);
 }
 
 .info-row span {
+  flex: 0 0 auto;
   color: var(--muted);
 }
 
@@ -128,24 +154,28 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 650;
+  text-align: right;
+  color: var(--ink);
+  font-weight: 500;
 }
 
+/* ---------- setting rows ---------- */
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 14px;
   padding: 0 2px;
-  font-size: 13px;
-  color: var(--muted);
+  font-size: 13.5px;
+  color: var(--ink);
 }
 
 .toggle {
   position: relative;
   display: inline-block;
-  width: 36px;
-  height: 20px;
+  width: 40px;
+  height: 24px;
   flex: 0 0 auto;
 }
 
@@ -159,126 +189,180 @@ p {
 .toggle-track {
   position: absolute;
   inset: 0;
-  background: var(--line);
-  border-radius: 10px;
+  background: #e3e3e8;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.22s ease;
 }
 
 .toggle-track::before {
   content: '';
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   left: 2px;
   bottom: 2px;
   background: #fff;
   border-radius: 50%;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.22s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .toggle input:checked + .toggle-track {
-  background: var(--primary);
+  background: var(--ok);
 }
 
 .toggle input:checked + .toggle-track::before {
   transform: translateX(16px);
 }
 
+.toggle input:focus-visible + .toggle-track {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ---------- language segmented control ---------- */
+.lang-switch {
+  display: inline-flex;
+  gap: 0;
+  padding: 2px;
+  background: var(--surface-strong);
+  border-radius: 9px;
+}
+
+.lang-switch button {
+  width: auto;
+  min-height: 26px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+
+.lang-switch button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
+
+.lang-switch button.active {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- actions ---------- */
 .actions {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.action-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
 }
 
 button {
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-btn);
   background: var(--primary);
   color: #ffffff;
   font: inherit;
-  font-weight: 700;
+  font-weight: 500;
+  font-size: 15px;
   cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.08s ease;
 }
 
 button:hover:not(:disabled) {
   background: var(--primary-hover);
 }
 
+button:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  transform: none;
 }
 
-button.danger {
-  background: var(--danger);
+/* paired secondary buttons sit a touch quieter than the primary */
+.action-pair button {
+  min-height: 42px;
+  font-size: 14px;
 }
 
-button.danger:hover:not(:disabled) {
-  background: var(--danger-hover);
+/* pause -> tinted blue when active */
+.actions .secondary:not(:disabled) {
+  background: var(--primary-tint);
+  color: var(--primary);
 }
 
-button.secondary {
-  background: #4f627a;
+.actions .secondary:not(:disabled):hover {
+  background: var(--primary-tint-hover);
 }
 
-button.secondary:hover:not(:disabled) {
-  background: #405168;
+/* stop -> tinted red when active */
+.actions .danger:not(:disabled) {
+  background: var(--danger-tint);
+  color: var(--danger);
 }
 
-button.success {
-  background: var(--ok);
+.actions .danger:not(:disabled):hover {
+  background: var(--danger-tint-hover);
 }
 
-button.success:hover:not(:disabled) {
-  background: #0f6f2f;
+/* export inherits the solid primary look (it is the main CTA once ready) */
+
+/* any disabled stacked action button reads as a quiet neutral, not faded color */
+#startButton:disabled,
+#pauseButton:disabled,
+#stopButton:disabled,
+#exportButton:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-ink);
 }
 
-button.ghost {
+/* reset -> quiet text button */
+.ghost {
+  min-height: 32px;
   background: transparent;
   color: var(--muted);
-  border: 1px solid var(--line);
-  font-weight: 600;
-  min-height: 34px;
+  font-size: 13px;
+  font-weight: 400;
 }
 
-button.ghost:hover:not(:disabled) {
-  background: #f0f3f8;
+.ghost:hover:not(:disabled) {
+  background: var(--surface);
   color: var(--danger);
-  border-color: var(--danger);
 }
 
-.lang-switch {
-  display: inline-flex;
-  gap: 4px;
+.ghost:disabled {
+  background: transparent;
+  color: var(--disabled-ink);
 }
 
-.lang-switch button {
-  width: auto;
-  min-height: 26px;
-  padding: 3px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.lang-switch button.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-
+/* ---------- message ---------- */
 .message {
-  min-height: 20px;
-  margin-top: 10px;
+  min-height: 18px;
+  margin-top: 12px;
   color: var(--muted);
+  font-size: 12.5px;
   line-height: 1.45;
+  text-align: center;
 }
 
 .message.error {
@@ -287,4 +371,11 @@ button.ghost:hover:not(:disabled) {
 
 .message.warning {
   color: var(--warn);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

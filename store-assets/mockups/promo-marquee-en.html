@@ -1,0 +1,87 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1400px;height:560px}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;color:#1d1d1f;
+  background:linear-gradient(160deg,#fbfbfd 0%,#e9ebef 100%);overflow:hidden;-webkit-font-smoothing:antialiased}
+.stage{width:1400px;height:560px;display:flex;align-items:center;justify-content:space-between;padding:0 96px}
+.left{max-width:640px}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.logo{width:60px;height:60px;border-radius:15px;background:linear-gradient(160deg,#0a84ff 0%,#0060d6 100%);
+  position:relative;flex:0 0 auto;box-shadow:0 8px 20px rgba(0,113,227,.32)}
+.bars{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;align-items:flex-end;gap:4px;height:23px}
+.bars i{width:5px;border-radius:2.5px;background:#fff;display:block}
+.bars i:nth-child(1){height:11px}.bars i:nth-child(2){height:23px}.bars i:nth-child(3){height:16px}
+.logo::after{content:'';position:absolute;right:11px;top:11px;width:9px;height:9px;border-radius:50%;
+  background:#ff453a;box-shadow:0 0 0 3px rgba(255,69,58,.25)}
+.brand span{font-size:24px;font-weight:600;letter-spacing:-.3px}
+h1{font-size:52px;font-weight:600;line-height:1.1;letter-spacing:-1.4px}
+.tag{font-size:21px;color:#5b5b60;margin-top:22px;line-height:1.55;max-width:560px}
+.badges{display:flex;gap:10px;margin-top:30px;flex-wrap:wrap}
+.b{font-size:15px;font-weight:500;padding:9px 16px;border-radius:999px;background:#fff;
+  border:.5px solid rgba(0,0,0,.1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.b.blue{color:#0071e3}.b.green{color:#1a8f3c}
+/* popup mockup */
+.window{width:430px;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(20,30,60,.22);
+  overflow:hidden;border:.5px solid rgba(0,0,0,.06);flex:0 0 auto}
+.winbar{height:44px;background:#f6f6f8;display:flex;align-items:center;padding:0 16px;gap:8px;border-bottom:.5px solid rgba(0,0,0,.06)}
+.dot{width:11px;height:11px;border-radius:50%}
+.dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+.url{flex:1;margin-left:14px;height:25px;background:#fff;border:.5px solid rgba(0,0,0,.08);border-radius:7px;
+  display:flex;align-items:center;padding:0 12px;font-size:13px;color:#86868b}
+.popwrap{padding:26px 22px;display:flex;justify-content:center;background:#fff}
+.popup{width:340px;font-size:14px;zoom:1.04}
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.b1{display:flex;align-items:center;gap:9px;flex:1 1 auto}
+.sd{width:8px;height:8px;border-radius:50%;background:#34c759;flex:0 0 auto}
+.popup h2{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.sub{color:#86868b;font-size:12px;margin-top:1px}
+.timer{font-size:30px;font-weight:300;color:#1d1d1f;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.gear{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;color:#86868b;flex:0 0 auto}
+.panel{background:#f5f5f7;border-radius:13px;overflow:hidden}
+.r{position:relative;display:flex;align-items:center;justify-content:space-between;padding:9px 14px;font-size:13.5px}
+.r+.r::before{content:'';position:absolute;top:0;left:14px;right:0;height:.5px;background:rgba(60,60,67,.12)}
+.r .k{color:#86868b}.r .v{font-weight:500}
+.setrow{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:0 2px;font-size:13.5px}
+.tg{width:40px;height:24px;background:#34c759;border-radius:12px;position:relative;flex:0 0 auto}
+.tg::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;right:2px;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.acts{display:grid;gap:8px;margin-top:12px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{min-height:42px;border-radius:12px;font-weight:500;font-size:15px;display:flex;align-items:center;justify-content:center;background:#0071e3;color:#fff}
+.pair .btn{min-height:40px;font-size:14px}
+.btn.dis{background:#f0f0f2;color:#c5c5c7}
+.btn.ghost{background:transparent;color:#86868b;min-height:30px;font-size:13px;font-weight:400}
+</style></head><body>
+<div class="stage">
+  <div class="left">
+    <div class="brand"><div class="logo"><span class="bars"><i></i><i></i><i></i></span></div><span>Tab Audio Recorder</span></div>
+    <h1>Record any tab's<br>audio, locally</h1>
+    <p class="tag">One click to capture the current tab. Export as WebM/Opus or MP3 — no uploads, no microphone, no tracking.</p>
+    <div class="badges"><span class="b blue">MP3 / WebM</span><span class="b">Dark mode</span>
+      <span class="b">EN / 简 / 繁</span><span class="b green">Local only</span></div>
+  </div>
+  <div class="window">
+    <div class="winbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <div class="url">video.example.com/lecture</div></div>
+    <div class="popwrap"><div class="popup">
+      <div class="topbar"><div class="b1"><span class="sd"></span>
+        <div><div style="font-size:16px;font-weight:600;letter-spacing:-.01em">Tab Audio Recorder</div><div class="sub">Idle</div></div></div>
+        <div class="timer">0:00</div>
+        <span class="gear"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
+      </div>
+      <div class="panel">
+        <div class="r"><span class="k">Current tab</span><span class="v">Online course · Lesson 3</span></div>
+        <div class="r"><span class="k">Output format</span><span class="v">WebM / Opus</span></div>
+        <div class="r"><span class="k">Save mode</span><span class="v">Manual export</span></div>
+        <div class="r"><span class="k">File state</span><span class="v">Not created</span></div>
+      </div>
+      <div class="setrow"><span>Auto-pause when the tab is muted</span><span class="tg"></span></div>
+      <div class="acts">
+        <div class="btn">Record this tab</div>
+        <div class="pair"><div class="btn dis">Pause</div><div class="btn dis">Stop</div></div>
+        <div class="btn dis">Export recording</div>
+        <div class="btn ghost">Reset</div>
+      </div>
+    </div></div>
+  </div>
+</div>
+</body></html>

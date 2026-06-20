@@ -1,27 +1,38 @@
 :root {
   color-scheme: light;
-  --bg: #ffffff;
+  --bg: #eef2f8;
   --surface: #f5f5f7;
   --surface-strong: #f0f0f2;
   --ink: #1d1d1f;
   --muted: #86868b;
-  --hairline: rgba(60, 60, 67, 0.12);
+  --hairline: rgba(60, 60, 67, 0.1);
   --primary: #0071e3;
   --primary-hover: #0077ed;
-  --primary-tint: #eef4ff;
-  --primary-tint-hover: #e2ecfd;
+  --primary-tint: rgba(0, 113, 227, 0.12);
+  --primary-tint-hover: rgba(0, 113, 227, 0.2);
   --danger: #ff3b30;
-  --danger-tint: #ffeceb;
-  --danger-tint-hover: #ffe1df;
+  --danger-tint: rgba(255, 59, 48, 0.12);
+  --danger-tint-hover: rgba(255, 59, 48, 0.2);
   --ok: #34c759;
-  --warn: #ff9f0a;
-  --disabled-bg: #f0f0f2;
-  --disabled-ink: #c5c5c7;
-  --toggle-off: #e3e3e8;
-  --hover-overlay: rgba(0, 0, 0, 0.03);
-  --radius-card: 18px;
-  --radius-group: 13px;
-  --radius-btn: 12px;
+  --warn: #b25b00;
+  --disabled-ink: #a4a4ac;
+  --toggle-off: #d6d8df;
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  /* glass / vibrancy */
+  --grad-top: #eef2f8;
+  --grad-bot: #e3e9f2;
+  --glow-1: rgba(90, 150, 255, 0.22);
+  --glow-2: rgba(170, 120, 255, 0.18);
+  --card-bg: rgba(255, 255, 255, 0.55);
+  --card-border: rgba(255, 255, 255, 0.72);
+  --card-hi: rgba(255, 255, 255, 0.6);
+  --card-hover: rgba(255, 255, 255, 0.82);
+  --primary-grad: linear-gradient(180deg, #0a84ff, #0069df);
+  --primary-grad-hover: linear-gradient(180deg, #1f8fff, #0a73e6);
+  --primary-shadow: 0 4px 12px rgba(0, 105, 223, 0.3);
+  --radius-card: 20px;
+  --radius-group: 16px;
+  --radius-btn: 14px;
 }
 
 :root[data-theme="dark"] {
@@ -34,17 +45,27 @@
   --hairline: rgba(255, 255, 255, 0.1);
   --primary: #0a84ff;
   --primary-hover: #3395ff;
-  --primary-tint: rgba(10, 132, 255, 0.22);
-  --primary-tint-hover: rgba(10, 132, 255, 0.32);
+  --primary-tint: rgba(10, 132, 255, 0.26);
+  --primary-tint-hover: rgba(10, 132, 255, 0.36);
   --danger: #ff453a;
-  --danger-tint: rgba(255, 69, 58, 0.22);
-  --danger-tint-hover: rgba(255, 69, 58, 0.32);
+  --danger-tint: rgba(255, 69, 58, 0.26);
+  --danger-tint-hover: rgba(255, 69, 58, 0.36);
   --ok: #30d158;
   --warn: #ffd60a;
-  --disabled-bg: #2c2c2e;
-  --disabled-ink: #5a5a5e;
+  --disabled-ink: #6a6a70;
   --toggle-off: #39393d;
   --hover-overlay: rgba(255, 255, 255, 0.06);
+  --grad-top: #262b33;
+  --grad-bot: #15181d;
+  --glow-1: rgba(70, 130, 255, 0.2);
+  --glow-2: rgba(150, 100, 255, 0.16);
+  --card-bg: rgba(255, 255, 255, 0.07);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --card-hi: rgba(255, 255, 255, 0.08);
+  --card-hover: rgba(255, 255, 255, 0.12);
+  --primary-grad: linear-gradient(180deg, #0a84ff, #0a6fe0);
+  --primary-grad-hover: linear-gradient(180deg, #2b95ff, #0a7af0);
+  --primary-shadow: 0 4px 14px rgba(10, 132, 255, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -58,17 +79,27 @@
     --hairline: rgba(255, 255, 255, 0.1);
     --primary: #0a84ff;
     --primary-hover: #3395ff;
-    --primary-tint: rgba(10, 132, 255, 0.22);
-    --primary-tint-hover: rgba(10, 132, 255, 0.32);
+    --primary-tint: rgba(10, 132, 255, 0.26);
+    --primary-tint-hover: rgba(10, 132, 255, 0.36);
     --danger: #ff453a;
-    --danger-tint: rgba(255, 69, 58, 0.22);
-    --danger-tint-hover: rgba(255, 69, 58, 0.32);
+    --danger-tint: rgba(255, 69, 58, 0.26);
+    --danger-tint-hover: rgba(255, 69, 58, 0.36);
     --ok: #30d158;
     --warn: #ffd60a;
-    --disabled-bg: #2c2c2e;
-    --disabled-ink: #5a5a5e;
+    --disabled-ink: #6a6a70;
     --toggle-off: #39393d;
     --hover-overlay: rgba(255, 255, 255, 0.06);
+    --grad-top: #262b33;
+    --grad-bot: #15181d;
+    --glow-1: rgba(70, 130, 255, 0.2);
+    --glow-2: rgba(150, 100, 255, 0.16);
+    --card-bg: rgba(255, 255, 255, 0.07);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --card-hi: rgba(255, 255, 255, 0.08);
+    --card-hover: rgba(255, 255, 255, 0.12);
+    --primary-grad: linear-gradient(180deg, #0a84ff, #0a6fe0);
+    --primary-grad-hover: linear-gradient(180deg, #2b95ff, #0a7af0);
+    --primary-shadow: 0 4px 14px rgba(10, 132, 255, 0.4);
   }
 }
 
@@ -79,9 +110,12 @@
 body {
   margin: 0;
   min-width: 340px;
-  background: var(--bg);
+  background:
+    radial-gradient(42% 38% at 16% 6%, var(--glow-1), transparent 70%),
+    radial-gradient(46% 42% at 92% 98%, var(--glow-2), transparent 70%),
+    linear-gradient(165deg, var(--grad-top) 0%, var(--grad-bot) 100%);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
@@ -171,31 +205,40 @@ p {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- icon buttons (gear / back) ---------- */
+/* ---------- icon buttons (gear / back) — a clear frosted chip ---------- */
 .icon-btn {
-  width: 30px;
-  min-height: 30px;
-  height: 30px;
+  width: 32px;
+  min-height: 32px;
+  height: 32px;
   flex: 0 0 auto;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
+  border-radius: 10px;
+  background: var(--card-bg);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), inset 0 1px 0 var(--card-hi);
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: var(--surface);
+  background: var(--card-hover);
   color: var(--ink);
 }
 
-/* ---------- info panel (iOS grouped list) ---------- */
-.info-panel {
-  background: var(--surface);
+/* ---------- info panel (frosted glass grouped list) ---------- */
+.info-panel,
+.opt-list {
+  background: var(--card-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-group);
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 0 var(--card-hi);
 }
 
 .info-row {
@@ -204,7 +247,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 14px;
+  padding: 10px 14px;
   font-size: 13.5px;
 }
 
@@ -279,7 +322,7 @@ p {
   background: #fff;
   border-radius: 50%;
   transition: transform 0.22s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .toggle input:checked + .toggle-track {
@@ -308,22 +351,20 @@ p {
   gap: 8px;
 }
 
+/* base: neutral; primary look is applied only to the per-state main CTA */
 button {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 0;
   border-radius: var(--radius-btn);
-  background: var(--primary);
+  background: transparent;
   color: #ffffff;
   font: inherit;
   font-weight: 500;
   font-size: 15px;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.08s ease;
-}
-
-button:hover:not(:disabled) {
-  background: var(--primary-hover);
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.08s ease, filter 0.18s ease;
 }
 
 button:active:not(:disabled) {
@@ -340,41 +381,59 @@ button:disabled {
   transform: none;
 }
 
+/* primary CTA (start; export once a recording is ready) */
+#startButton,
+#exportButton {
+  background: var(--primary-grad);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: var(--primary-shadow);
+}
+
+#startButton:hover:not(:disabled),
+#exportButton:hover:not(:disabled) {
+  background: var(--primary-grad-hover);
+}
+
 /* paired secondary buttons sit a touch quieter than the primary */
 .action-pair button {
   min-height: 40px;
   font-size: 14px;
 }
 
-/* pause -> tinted blue when active */
+/* pause -> tinted blue glass when active */
 .actions .secondary:not(:disabled) {
   background: var(--primary-tint);
   color: var(--primary);
+  box-shadow: none;
 }
 
 .actions .secondary:not(:disabled):hover {
   background: var(--primary-tint-hover);
 }
 
-/* stop -> tinted red when active */
+/* stop -> tinted red glass when active */
 .actions .danger:not(:disabled) {
   background: var(--danger-tint);
   color: var(--danger);
+  box-shadow: none;
 }
 
 .actions .danger:not(:disabled):hover {
   background: var(--danger-tint-hover);
 }
 
-/* export inherits the solid primary look (it is the main CTA once ready) */
-
-/* any disabled stacked action button reads as a quiet neutral, not faded color */
+/* any disabled stacked action button reads as a quiet frosted neutral */
 #startButton:disabled,
 #pauseButton:disabled,
 #stopButton:disabled,
 #exportButton:disabled {
-  background: var(--disabled-bg);
+  background: var(--card-bg);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
   color: var(--disabled-ink);
+  box-shadow: none;
 }
 
 /* reset -> quiet text button */
@@ -384,10 +443,11 @@ button:disabled {
   color: var(--muted);
   font-size: 13px;
   font-weight: 400;
+  box-shadow: none;
 }
 
 .ghost:hover:not(:disabled) {
-  background: var(--surface);
+  background: var(--hover-overlay);
   color: var(--danger);
 }
 
@@ -422,12 +482,8 @@ button:disabled {
 .settings-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   margin-bottom: 14px;
-}
-
-.settings-bar .icon-btn {
-  margin-left: -6px;
 }
 
 .settings-title {
@@ -447,12 +503,6 @@ button:disabled {
   margin-top: 16px;
 }
 
-.opt-list {
-  background: var(--surface);
-  border-radius: var(--radius-group);
-  overflow: hidden;
-}
-
 .opt-row {
   position: relative;
   width: 100%;
@@ -467,6 +517,7 @@ button:disabled {
   color: var(--ink);
   font-size: 14px;
   font-weight: 400;
+  box-shadow: none;
 }
 
 .opt-row:hover:not(:disabled) {

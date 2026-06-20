@@ -17,8 +17,10 @@ body.dark{background:linear-gradient(165deg,#222226 0%,#141416 100%);color:#f5f5
 /* 左侧文案 */
 .copy{max-width:540px}
 .copy h2{font-size:54px;line-height:1.14;font-weight:600;letter-spacing:-1.4px;color:var(--ink)}
+body.en .copy h2{font-size:46px;letter-spacing:-1px;line-height:1.1}
 body.dark .copy h2{color:#f5f5f7}
 .copy p{font-size:21px;line-height:1.6;color:#5b5b60;margin-top:24px;font-weight:400}
+body.en .copy p{font-size:20px}
 body.dark .copy p{color:#a9a9b0}
 .badges{display:flex;gap:10px;margin-top:36px;flex-wrap:wrap}
 .badge{font-size:15px;font-weight:500;padding:9px 16px;border-radius:999px;background:#fff;
@@ -38,7 +40,7 @@ body.dark .badge.blue{color:#5aacff}body.dark .badge.green{color:#5fd97f}
 .url{flex:1;margin-left:14px;height:26px;background:#fff;border:.5px solid rgba(0,0,0,.08);border-radius:7px;
   display:flex;align-items:center;padding:0 12px;font-size:13px;color:#86868b}
 .window.dark .url{background:#1c1c1e;border-color:rgba(255,255,255,.1);color:#98989f}
-/* ---- 真实 popup（放大 1.22x 以便商店展示） ---- */
+/* ---- 真实 popup（放大 1.12x 以便商店展示） ---- */
 .popwrap{padding:30px 22px;display:flex;justify-content:center;background:var(--bg)}
 .window.dark .popwrap{background:#1c1c1e}
 .popup{width:340px;padding:4px 2px;font-size:14px;zoom:1.12}
@@ -94,12 +96,11 @@ body.dark .badge.blue{color:#5aacff}body.dark .badge.green{color:#5fd97f}
   font-size:14px;color:var(--ink)}
 .opt-row:not(:first-child)::before{content:'';position:absolute;top:0;left:14px;right:0;height:.5px;background:var(--hairline)}
 .opt-check{color:var(--primary);font-weight:600}
-.muted-val{color:var(--muted)}
-</style></head><body class="dark">
+</style></head><body class="zh dark">
 <div class="stage"><div class="copy"><h2>深色护眼，<br>隐私优先</h2>
-       <p>全程在浏览器本地处理，连 MP3 转换也不联网，没有任何外部请求，录音只属于你自己。</p>
-       <div class="badges"><span class="badge">深色模式</span>
-       <span class="badge green">本地处理</span><span class="badge green">无网络请求</span></div></div>
+               <p>全程在浏览器本地处理，连 MP3 转换也不联网，没有任何外部请求，录音只属于你自己。</p>
+               <div class="badges"><span class="badge">深色模式</span>
+               <span class="badge green">本地处理</span><span class="badge green">无网络请求</span></div></div>
 <div class="window dark">
   <div class="winbar"><span class="dot r"></span><span class="dot y"></span>
     <span class="dot g"></span><div class="url">video.example.com/lecture</div></div>

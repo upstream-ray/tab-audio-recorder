@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""生成 5 张 1280x800 中文商店截图 mockup。内嵌 0.2.0 真实 popup 的精确样式。"""
+"""生成商店截图 mockup（1280x800）。内嵌 0.2.0 真实 popup 样式，支持中/英双语。
+中文输出到本目录，英文输出到 ./en/。"""
 import os
 
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,8 +36,10 @@ body.dark{background:linear-gradient(165deg,#222226 0%,#141416 100%);color:#f5f5
 /* 左侧文案 */
 .copy{max-width:540px}
 .copy h2{font-size:54px;line-height:1.14;font-weight:600;letter-spacing:-1.4px;color:var(--ink)}
+body.en .copy h2{font-size:46px;letter-spacing:-1px;line-height:1.1}
 body.dark .copy h2{color:#f5f5f7}
 .copy p{font-size:21px;line-height:1.6;color:#5b5b60;margin-top:24px;font-weight:400}
+body.en .copy p{font-size:20px}
 body.dark .copy p{color:#a9a9b0}
 .badges{display:flex;gap:10px;margin-top:36px;flex-wrap:wrap}
 .badge{font-size:15px;font-weight:500;padding:9px 16px;border-radius:999px;background:#fff;
@@ -56,7 +59,7 @@ body.dark .badge.blue{color:#5aacff}body.dark .badge.green{color:#5fd97f}
 .url{flex:1;margin-left:14px;height:26px;background:#fff;border:.5px solid rgba(0,0,0,.08);border-radius:7px;
   display:flex;align-items:center;padding:0 12px;font-size:13px;color:#86868b}
 .window.dark .url{background:#1c1c1e;border-color:rgba(255,255,255,.1);color:#98989f}
-/* ---- 真实 popup（放大 1.22x 以便商店展示） ---- */
+/* ---- 真实 popup（放大 1.12x 以便商店展示） ---- */
 .popwrap{padding:30px 22px;display:flex;justify-content:center;background:var(--bg)}
 .window.dark .popwrap{background:#1c1c1e}
 .popup{width:340px;padding:4px 2px;font-size:14px;zoom:1.12}
@@ -112,16 +115,31 @@ body.dark .badge.blue{color:#5aacff}body.dark .badge.green{color:#5fd97f}
   font-size:14px;color:var(--ink)}
 .opt-row:not(:first-child)::before{content:'';position:absolute;top:0;left:14px;right:0;height:.5px;background:var(--hairline)}
 .opt-check{color:var(--primary);font-weight:600}
-.muted-val{color:var(--muted)}
 """
+
+# ---- 界面固定文案（popup chrome / 设置页） ----
+UI = {
+    "zh": dict(app="标签页录音", tab="当前标签页", fmt="输出格式", save="保存方式", save_v="手动导出",
+               state="文件状态", autopause="标签页静音时自动暂停",
+               start="开始录制当前标签页", pause="暂停录制", stop="停止录制", export="导出录音文件", reset="重置",
+               set_title="设置", set_lang="界面语言", follow_lang="跟随系统语言",
+               set_theme="主题", th_light="浅色", th_dark="深色", th_follow="跟随系统",
+               set_fmt="导出格式", fmt_webm="WebM(原始)", fmt_mp3="MP3"),
+    "en": dict(app="Tab Audio Recorder", tab="Current tab", fmt="Output format", save="Save mode", save_v="Manual export",
+               state="File state", autopause="Auto-pause when the tab is muted",
+               start="Record this tab", pause="Pause", stop="Stop", export="Export recording", reset="Reset",
+               set_title="Settings", set_lang="Language", follow_lang="Follow system language",
+               set_theme="Theme", th_light="Light", th_dark="Dark", th_follow="Follow system",
+               set_fmt="Export format", fmt_webm="WebM (original)", fmt_mp3="MP3"),
+}
 
 
 def b(label, cls=""):
     return f'<div class="btn {cls}">{label}</div>'
 
 
-def popup(status_dot, status_text, timer, tab_title, fmt, file_state, toggle_on,
-          start, pause, stop, export, msg="", msg_cls="", dark=False, status_rec=False):
+def popup(ui, status_dot, status_text, timer, tab_title, fmt, file_state, toggle_on,
+          start_cls, pause_cls, stop_cls, export_cls, msg="", msg_cls="", status_rec=False):
     toggle_cls = "toggle on" if toggle_on else "toggle"
     msg_html = f'<p class="message {msg_cls}">{msg}</p>' if msg else '<p class="message"></p>'
     st_cls = "rec" if status_rec else ""
@@ -129,53 +147,52 @@ def popup(status_dot, status_text, timer, tab_title, fmt, file_state, toggle_on,
     <header class="topbar">
       <div class="brand">
         <span class="status-dot {status_dot}"></span>
-        <div><h1>标签页录音</h1><p id="statusText" class="statusText {st_cls}">{status_text}</p></div>
+        <div><h1>{ui['app']}</h1><p id="statusText" class="statusText {st_cls}">{status_text}</p></div>
       </div>
       <div class="timer">{timer}</div>
       <span class="icon-btn">{GEAR}</span>
     </header>
     <section class="info-panel">
-      <div class="info-row"><span>当前标签页</span><strong>{tab_title}</strong></div>
-      <div class="info-row"><span>输出格式</span><strong>{fmt}</strong></div>
-      <div class="info-row"><span>保存方式</span><strong>手动导出</strong></div>
-      <div class="info-row"><span>文件状态</span><strong>{file_state}</strong></div>
+      <div class="info-row"><span>{ui['tab']}</span><strong>{tab_title}</strong></div>
+      <div class="info-row"><span>{ui['fmt']}</span><strong>{fmt}</strong></div>
+      <div class="info-row"><span>{ui['save']}</span><strong>{ui['save_v']}</strong></div>
+      <div class="info-row"><span>{ui['state']}</span><strong>{file_state}</strong></div>
     </section>
-    <div class="setting-row"><span>标签页静音时自动暂停</span>
+    <div class="setting-row"><span>{ui['autopause']}</span>
       <span class="{toggle_cls}"><span class="toggle-track"></span></span></div>
     <div class="actions">
-      {b(*start)}
-      <div class="pair">{b(*pause)}{b(*stop)}</div>
-      {b(*export)}
-      {b("重置","ghost")}
+      {b(ui['start'], start_cls)}
+      <div class="pair">{b(ui['pause'], pause_cls)}{b(ui['stop'], stop_cls)}</div>
+      {b(ui['export'], export_cls)}
+      {b(ui['reset'], "ghost")}
     </div>
     {msg_html}"""
 
 
-def opt(label, active, val_right=None):
-    check = '<span class="opt-check">✓</span>' if active else (
-        f'<span class="muted-val">{val_right}</span>' if val_right else '<span></span>')
+def opt(label, active):
+    check = '<span class="opt-check">✓</span>' if active else '<span></span>'
     return f'<div class="opt-row"><span>{label}</span>{check}</div>'
 
 
-def settings_panel():
+def settings_panel(ui):
     return f"""
     <header class="settings-bar"><span class="icon-btn">{CHEVRON}</span>
-      <h1 class="settings-title">设置</h1></header>
-    <p class="group-label">界面语言</p>
-    <div class="opt-list">{opt("简体中文",True)}{opt("繁體中文",False)}{opt("English",False)}{opt("跟随系统语言",False)}</div>
+      <h1 class="settings-title">{ui['set_title']}</h1></header>
+    <p class="group-label">{ui['set_lang']}</p>
+    <div class="opt-list">{opt("简体中文",True)}{opt("繁體中文",False)}{opt("English",False)}{opt(ui['follow_lang'],False)}</div>
     <div class="group-gap"></div>
-    <p class="group-label">主题</p>
-    <div class="opt-list">{opt("浅色",False)}{opt("深色",True)}{opt("跟随系统",False)}</div>
+    <p class="group-label">{ui['set_theme']}</p>
+    <div class="opt-list">{opt(ui['th_light'],False)}{opt(ui['th_dark'],True)}{opt(ui['th_follow'],False)}</div>
     <div class="group-gap"></div>
-    <p class="group-label">导出格式</p>
-    <div class="opt-list">{opt("WebM(原始)",False)}{opt("MP3",True)}</div>"""
+    <p class="group-label">{ui['set_fmt']}</p>
+    <div class="opt-list">{opt(ui['fmt_webm'],False)}{opt(ui['fmt_mp3'],True)}</div>"""
 
 
-def page(copy_html, inner, dark=False, settings=False):
-    body_cls = "dark" if dark else ""
+def page(copy_html, inner, lang, dark=False):
+    body_cls = " ".join(c for c in [lang, ("dark" if dark else "")] if c)
     win_cls = "window dark" if dark else "window"
     pop_cls = "popup dark" if dark else "popup"
-    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    return f"""<!doctype html><html lang="{'zh-CN' if lang=='zh' else 'en'}"><head><meta charset="utf-8">
 <style>{BASE_CSS}</style></head><body class="{body_cls}">
 <div class="stage"><div class="copy">{copy_html}</div>
 <div class="{win_cls}">
@@ -185,61 +202,92 @@ def page(copy_html, inner, dark=False, settings=False):
 </div></div></body></html>"""
 
 
-scenes = {}
+# ---- 每个语言的场景文案 + popup 状态 ----
+def build_scenes(lang):
+    ui = UI[lang]
+    s = {}
+    if lang == "zh":
+        s["01-record-current-tab"] = page(
+            """<h2>一键录制<br>当前标签页音频</h2>
+               <p>打开任意在播放声音的标签页，点一下「开始录制」，立刻开始捕获。</p>
+               <div class="badges"><span class="badge blue">WebM / Opus</span>
+               <span class="badge blue">MP3</span><span class="badge">无需麦克风</span></div>""",
+            popup(ui, "ready", "待机", "0:00", "在线课程 · 第 3 讲", "WebM / Opus", "未生成", False,
+                  "", "dis", "dis", "dis"), lang)
+        s["02-recording-in-progress"] = page(
+            """<h2>边听边录，<br>声音不打断</h2>
+               <p>录音期间标签页声音照常播放，关闭弹窗也不会中断，随时暂停再继续。</p>
+               <div class="badges"><span class="badge">实时计时</span>
+               <span class="badge blue">仅当前标签页</span><span class="badge">暂停 / 继续</span></div>""",
+            popup(ui, "recording", "录制中", "12:48", "直播回放 · 技术分享", "WebM / Opus", "缓冲中 · 18.6 MB", True,
+                  "dis", "tint-blue", "tint-red", "dis",
+                  "录音进行中，可关闭弹窗，录制不会中断。", "", status_rec=True), lang)
+        s["03-pause-and-resume"] = page(
+            """<h2>语言、主题、格式<br>一处设置搞定</h2>
+               <p>弹窗内的设置页：界面语言简繁中英任选，浅色 / 深色 / 跟随系统，导出 WebM 或 MP3。</p>
+               <div class="badges"><span class="badge">简 / 繁 / 英</span>
+               <span class="badge">深色模式</span><span class="badge blue">MP3 导出</span></div>""",
+            settings_panel(ui), lang)
+        s["04-export-local-file"] = page(
+            """<h2>录完导出，<br>保存到本地</h2>
+               <p>停止后点「导出录音文件」，按所选格式保存为 MP3 或 WebM，文件只留在你的电脑上。</p>
+               <div class="badges"><span class="badge green">本地保存</span>
+               <span class="badge blue">MP3</span><span class="badge">WebM / Opus</span></div>""",
+            popup(ui, "ready", "可导出", "15:20", "直播回放 · 技术分享", "MP3", "已生成 · 14.2 MB", True,
+                  "dis", "dis", "dis", "",
+                  "录音已就绪，点「导出录音文件」保存。", "ok"), lang)
+        s["05-private-by-design"] = page(
+            """<h2>深色护眼，<br>隐私优先</h2>
+               <p>全程在浏览器本地处理，连 MP3 转换也不联网，没有任何外部请求，录音只属于你自己。</p>
+               <div class="badges"><span class="badge">深色模式</span>
+               <span class="badge green">本地处理</span><span class="badge green">无网络请求</span></div>""",
+            popup(ui, "ready", "待机", "0:00", "任意标签页", "WebM / Opus", "未生成", False,
+                  "", "dis", "dis", "dis"), lang, dark=True)
+    else:
+        s["01-record-current-tab"] = page(
+            """<h2>Record any tab's<br>audio in one click</h2>
+               <p>Open any tab that's playing sound and hit Record — capture starts instantly.</p>
+               <div class="badges"><span class="badge blue">WebM / Opus</span>
+               <span class="badge blue">MP3</span><span class="badge">No microphone</span></div>""",
+            popup(ui, "ready", "Idle", "0:00", "Online course · Lesson 3", "WebM / Opus", "Not created", False,
+                  "", "dis", "dis", "dis"), lang)
+        s["02-recording-in-progress"] = page(
+            """<h2>Keep listening<br>while you record</h2>
+               <p>The tab keeps playing while you record. Close the popup and it won't stop — pause and resume anytime.</p>
+               <div class="badges"><span class="badge">Live timer</span>
+               <span class="badge blue">Current tab only</span><span class="badge">Pause / resume</span></div>""",
+            popup(ui, "recording", "Recording", "12:48", "Livestream replay · Tech talk", "WebM / Opus", "Buffered · 18.6 MB", True,
+                  "dis", "tint-blue", "tint-red", "dis",
+                  "Recording in progress — you can close the popup.", "", status_rec=True), lang)
+        s["03-pause-and-resume"] = page(
+            """<h2>Language, theme, format<br>— all in one place</h2>
+               <p>An in-popup settings page: interface language, light / dark / system theme, and export as WebM or MP3.</p>
+               <div class="badges"><span class="badge">EN / 简 / 繁</span>
+               <span class="badge">Dark mode</span><span class="badge blue">MP3 export</span></div>""",
+            settings_panel(ui), lang)
+        s["04-export-local-file"] = page(
+            """<h2>Stop, export,<br>keep it local</h2>
+               <p>Hit Export recording to save as MP3 or WebM — the file stays on your computer.</p>
+               <div class="badges"><span class="badge green">Local save</span>
+               <span class="badge blue">MP3</span><span class="badge">WebM / Opus</span></div>""",
+            popup(ui, "ready", "Ready to export", "15:20", "Livestream replay · Tech talk", "MP3", "Ready · 14.2 MB", True,
+                  "dis", "dis", "dis", "",
+                  "Recording ready — click Export recording to save.", "ok"), lang)
+        s["05-private-by-design"] = page(
+            """<h2>Dark mode,<br>privacy first</h2>
+               <p>Everything runs locally in your browser — even MP3 conversion. No external requests. Your recording is yours.</p>
+               <div class="badges"><span class="badge">Dark mode</span>
+               <span class="badge green">Local processing</span><span class="badge green">No network</span></div>""",
+            popup(ui, "ready", "Idle", "0:00", "Any tab", "WebM / Opus", "Not created", False,
+                  "", "dis", "dis", "dis"), lang, dark=True)
+    return s
 
-# 1 — 一键录制当前标签页（就绪态）
-scenes["01-record-current-tab"] = page(
-    """<h2>一键录制<br>当前标签页音频</h2>
-       <p>打开任意在播放声音的标签页，点一下「开始录制」，立刻开始捕获。</p>
-       <div class="badges"><span class="badge blue">WebM / Opus</span>
-       <span class="badge blue">MP3</span><span class="badge">无需麦克风</span></div>""",
-    popup("ready", "待机", "0:00", "在线课程 · 第 3 讲", "WebM / Opus", "未生成", False,
-          ("开始录制当前标签页", ""), ("暂停录制", "dis"),
-          ("停止录制", "dis"), ("导出录音文件", "dis")))
 
-# 2 — 边听边录（录制中）
-scenes["02-recording-in-progress"] = page(
-    """<h2>边听边录，<br>声音不打断</h2>
-       <p>录音期间标签页声音照常播放，关闭弹窗也不会中断，随时暂停再继续。</p>
-       <div class="badges"><span class="badge">实时计时</span>
-       <span class="badge blue">仅当前标签页</span><span class="badge">暂停 / 继续</span></div>""",
-    popup("recording", "录制中", "12:48", "直播回放 · 技术分享", "WebM / Opus", "缓冲中 · 18.6 MB", True,
-          ("开始录制当前标签页", "dis"), ("暂停录制", "tint-blue"),
-          ("停止录制", "tint-red"), ("导出录音文件", "dis"),
-          "录音进行中，可关闭弹窗，录制不会中断。", "", status_rec=True))
-
-# 3 — 一处设置，随手切换（设置页）
-scenes["03-pause-and-resume"] = page(
-    """<h2>语言、主题、格式<br>一处设置搞定</h2>
-       <p>弹窗内的设置页：界面语言简繁中英任选，浅色 / 深色 / 跟随系统，导出 WebM 或 MP3。</p>
-       <div class="badges"><span class="badge">简 / 繁 / 英</span>
-       <span class="badge">深色模式</span><span class="badge blue">MP3 导出</span></div>""",
-    settings_panel())
-
-# 4 — 录完导出（MP3）
-scenes["04-export-local-file"] = page(
-    """<h2>录完导出，<br>保存到本地</h2>
-       <p>停止后点「导出录音文件」，按所选格式保存为 MP3 或 WebM，文件只留在你的电脑上。</p>
-       <div class="badges"><span class="badge green">本地保存</span>
-       <span class="badge blue">MP3</span><span class="badge">WebM / Opus</span></div>""",
-    popup("ready", "可导出", "15:20", "直播回放 · 技术分享", "MP3", "已生成 · 14.2 MB", True,
-          ("开始录制当前标签页", "dis"), ("暂停录制", "dis"),
-          ("停止录制", "dis"), ("导出录音文件", ""),
-          "录音已就绪，点「导出录音文件」保存。", "ok"))
-
-# 5 — 深色模式 + 隐私
-scenes["05-private-by-design"] = page(
-    """<h2>深色护眼，<br>隐私优先</h2>
-       <p>全程在浏览器本地处理，连 MP3 转换也不联网，没有任何外部请求，录音只属于你自己。</p>
-       <div class="badges"><span class="badge">深色模式</span>
-       <span class="badge green">本地处理</span><span class="badge green">无网络请求</span></div>""",
-    popup("ready", "待机", "0:00", "任意标签页", "WebM / Opus", "未生成", False,
-          ("开始录制当前标签页", ""), ("暂停录制", "dis"),
-          ("停止录制", "dis"), ("导出录音文件", "dis"), dark=True),
-    dark=True)
-
-for name, html in scenes.items():
-    path = os.path.join(OUT_DIR, name + ".html")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(html)
-    print("wrote", path)
+for lang in ("zh", "en"):
+    out = OUT_DIR if lang == "zh" else os.path.join(OUT_DIR, "en")
+    os.makedirs(out, exist_ok=True)
+    for name, html in build_scenes(lang).items():
+        path = os.path.join(out, name + ".html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(html)
+        print("wrote", path)

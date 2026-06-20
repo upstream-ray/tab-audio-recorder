@@ -2,7 +2,7 @@
 // 不可靠（会导致 I18N 未定义），所以这里直接内联，保证 background 一定可用。
 // popup / offscreen 是 document 上下文，仍通过 <script src="i18n.js"> 共用同一份逻辑。
 (function () {
-  const SUPPORTED = ['en', 'zh_CN'];
+  const SUPPORTED = ['en', 'zh_CN', 'zh_TW'];
   const FALLBACK = 'en';
   const tables = {};
   let current = guessFromBrowser();
@@ -11,7 +11,10 @@
     // 与 i18n.js 保持一致：chrome.i18n 在受限上下文不可用时回退默认语言。
     try {
       const ui = (chrome.i18n.getUILanguage() || '').toLowerCase();
-      return ui.startsWith('zh') ? 'zh_CN' : 'en';
+      if (ui.startsWith('zh')) {
+        return /hant|tw|hk|mo/.test(ui) ? 'zh_TW' : 'zh_CN';
+      }
+      return 'en';
     } catch (error) {
       return FALLBACK;
     }
@@ -67,7 +70,9 @@
   }
 
   function bcp47() {
-    return current === 'zh_CN' ? 'zh-CN' : 'en';
+    if (current === 'zh_CN') return 'zh-CN';
+    if (current === 'zh_TW') return 'zh-TW';
+    return 'en';
   }
 
   globalThis.I18N = {

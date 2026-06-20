@@ -6,7 +6,7 @@
 // popup / offscreen 是 document 上下文，通过 <script src="i18n.js"> 共用本模块；
 // background（MV3 service worker）的 importScripts 加载不可靠，改用内联副本。
 (function () {
-  const SUPPORTED = ['en', 'zh_CN'];
+  const SUPPORTED = ['en', 'zh_CN', 'zh_TW'];
   const FALLBACK = 'en';
   const tables = {}; // lang -> 原始 messages.json 对象
   let current = guessFromBrowser(); // 当前实际生效语言
@@ -16,7 +16,10 @@
     // chrome.i18n 在 offscreen document 里不可用，访问会抛错，需容错回退。
     try {
       const ui = (chrome.i18n.getUILanguage() || '').toLowerCase();
-      return ui.startsWith('zh') ? 'zh_CN' : 'en';
+      if (ui.startsWith('zh')) {
+        return /hant|tw|hk|mo/.test(ui) ? 'zh_TW' : 'zh_CN';
+      }
+      return 'en';
     } catch (error) {
       return FALLBACK;
     }
@@ -96,7 +99,9 @@
   }
 
   function bcp47() {
-    return current === 'zh_CN' ? 'zh-CN' : 'en';
+    if (current === 'zh_CN') return 'zh-CN';
+    if (current === 'zh_TW') return 'zh-TW';
+    return 'en';
   }
 
   globalThis.I18N = {

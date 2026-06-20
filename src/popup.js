@@ -16,12 +16,28 @@ function localizeStatic() {
   }
 }
 
+const THEMES = ['light', 'dark', 'auto'];
+
+async function applyStoredTheme() {
+  let theme = 'auto';
+  try {
+    const { uiTheme } = await chrome.storage.local.get('uiTheme');
+    if (THEMES.includes(uiTheme)) {
+      theme = uiTheme;
+    }
+  } catch (error) {
+    // storage 不可用时使用跟随系统。
+  }
+  document.documentElement.dataset.theme = theme;
+}
+
 function setupSettings() {
   const settingsButton = document.getElementById('settingsButton');
   const backButton = document.getElementById('backButton');
   const mainView = document.getElementById('mainView');
   const settingsView = document.getElementById('settingsView');
   const langButtons = document.querySelectorAll('#langOptions [data-lang]');
+  const themeButtons = document.querySelectorAll('#themeOptions [data-theme-opt]');
 
   const showSettings = (open) => {
     mainView.hidden = open;
@@ -31,13 +47,13 @@ function setupSettings() {
   settingsButton.addEventListener('click', () => showSettings(true));
   backButton.addEventListener('click', () => showSettings(false));
 
-  const syncActive = () => {
+  const syncLangActive = () => {
     for (const button of langButtons) {
       button.classList.toggle('active', button.dataset.lang === I18N.pref);
     }
   };
 
-  syncActive();
+  syncLangActive();
 
   for (const button of langButtons) {
     button.addEventListener('click', async () => {
@@ -45,10 +61,35 @@ function setupSettings() {
         return;
       }
       await I18N.setLang(button.dataset.lang);
-      syncActive();
+      syncLangActive();
       localizeStatic();
       renderStatus(currentStatus);
       setMessage('');
+    });
+  }
+
+  const syncThemeActive = () => {
+    const active = document.documentElement.dataset.theme || 'auto';
+    for (const button of themeButtons) {
+      button.classList.toggle('active', button.dataset.themeOpt === active);
+    }
+  };
+
+  syncThemeActive();
+
+  for (const button of themeButtons) {
+    button.addEventListener('click', async () => {
+      const theme = button.dataset.themeOpt;
+      if (theme === document.documentElement.dataset.theme) {
+        return;
+      }
+      document.documentElement.dataset.theme = theme;
+      syncThemeActive();
+      try {
+        await chrome.storage.local.set({ uiTheme: theme });
+      } catch (error) {
+        // 持久化失败不影响本次切换。
+      }
     });
   }
 }
@@ -75,6 +116,7 @@ let timerId;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await I18N.ready;
+  await applyStoredTheme();
   localizeStatic();
   setupSettings();
 

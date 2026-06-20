@@ -4,7 +4,7 @@ Use these explanations in the Chrome Web Store privacy and permissions review fi
 
 ## Single Purpose
 
-Tab Audio Recorder lets users record audio from the currently selected browser tab and export the recording as a local WebM/Opus file. It does not upload recordings, record microphone audio, capture system-wide audio, or communicate with external servers.
+Tab Audio Recorder lets users record audio from the currently selected browser tab and export the recording locally as a WebM/Opus or MP3 file. It does not upload recordings, record microphone audio, capture system-wide audio, or communicate with external servers.
 
 ## `tabCapture`
 
@@ -32,7 +32,7 @@ Required to show recording status messages when the user controls recording with
 
 ## `storage`
 
-Required to save local extension state and user preferences, such as whether automatic pause behavior is enabled. Data remains in the user's browser.
+Required to save local extension state and user preferences — such as auto-pause behavior, interface language, theme, and export format. Data remains in the user's browser.
 
 ## Host Permissions
 
@@ -40,7 +40,7 @@ The extension does not request host permissions.
 
 ## Remote Code
 
-The extension does not use remote code.
+The extension does not use remote code. All scripts, including the MP3 encoder (lamejs, LGPL-3.0, bundled under `src/vendor/`), are packaged with the extension and executed locally; nothing is fetched or evaluated at runtime.
 
 ## Network Requests
 

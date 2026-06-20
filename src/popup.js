@@ -31,6 +31,15 @@ async function applyStoredTheme() {
   document.documentElement.dataset.theme = theme;
 }
 
+async function loadExportFormat() {
+  try {
+    const { exportFormat: stored } = await chrome.storage.local.get('exportFormat');
+    exportFormat = stored === 'mp3' ? 'mp3' : 'webm';
+  } catch (error) {
+    exportFormat = 'webm';
+  }
+}
+
 function setupSettings() {
   const settingsButton = document.getElementById('settingsButton');
   const backButton = document.getElementById('backButton');
@@ -92,6 +101,32 @@ function setupSettings() {
       }
     });
   }
+
+  const formatButtons = document.querySelectorAll('#formatOptions [data-format]');
+
+  const syncFormatActive = () => {
+    for (const button of formatButtons) {
+      button.classList.toggle('active', button.dataset.format === exportFormat);
+    }
+  };
+
+  syncFormatActive();
+
+  for (const button of formatButtons) {
+    button.addEventListener('click', async () => {
+      if (button.dataset.format === exportFormat) {
+        return;
+      }
+      exportFormat = button.dataset.format;
+      syncFormatActive();
+      renderStatus(currentStatus);
+      try {
+        await chrome.storage.local.set({ exportFormat });
+      } catch (error) {
+        // 持久化失败不影响本次切换。
+      }
+    });
+  }
 }
 
 const els = {
@@ -113,10 +148,12 @@ const els = {
 let currentStatus = { state: 'idle' };
 let statusReceivedAt = Date.now();
 let timerId;
+let exportFormat = 'webm';
 
 document.addEventListener('DOMContentLoaded', async () => {
   await I18N.ready;
   await applyStoredTheme();
+  await loadExportFormat();
   localizeStatic();
   setupSettings();
 
@@ -210,7 +247,7 @@ async function onStopClick() {
 
 async function onExportClick() {
   setBusy(true);
-  setMessage(t('msgExporting'));
+  setMessage(exportFormat === 'mp3' ? t('msgConvertingMp3') : t('msgExporting'));
 
   try {
     const response = await sendMessage({ target: 'background', type: 'EXPORT_RECORDING' });
@@ -306,7 +343,7 @@ function renderStatus(status) {
   els.statusDot.classList.toggle('paused', currentStatus.state === 'paused');
   els.statusDot.classList.toggle('ready', currentStatus.state === 'idle' || currentStatus.state === 'ready');
   els.tabTitle.textContent = currentStatus.title || '-';
-  els.formatText.textContent = formatMime(currentStatus.mimeType);
+  els.formatText.textContent = exportFormat === 'mp3' ? 'MP3' : formatMime(currentStatus.mimeType);
   els.fileState.textContent = getFileStateText(currentStatus);
 
   if (currentStatus.state === 'recording') {

@@ -77,6 +77,9 @@ async function handleMessage(message) {
     case 'GET_READY_RECORDING':
       return { ok: true, recording: completedRecording };
 
+    case 'TRANSCODE_RECORDING':
+      return transcodeRecording(message.format);
+
     case 'CLEAR_READY_RECORDING':
       clearCompletedRecording(message.objectUrl);
       notifyStatusChanged();
@@ -544,6 +547,104 @@ function clearCompletedRecording(objectUrl) {
   if (!objectUrl || completedRecording.objectUrl === objectUrl) {
     completedRecording = null;
   }
+}
+
+// 导出时按需把已完成录音(WebM/Opus)转成 MP3。
+// 录音管线保持不变，只有用户选了 MP3 导出才在这里解码 + 重编码。
+const MP3_BITRATE_KBPS = 128;
+
+async function transcodeRecording(format) {
+  if (format !== 'mp3') {
+    throw new Error(t('errTranscodeFailed'));
+  }
+
+  if (!completedRecording?.objectUrl) {
+    throw new Error(t('errNothingToExportYet'));
+  }
+
+  try {
+    let arrayBuffer = await fetch(completedRecording.objectUrl).then((res) => res.arrayBuffer());
+
+    const decodeContext = new AudioContext();
+    let audioBuffer;
+    try {
+      audioBuffer = await decodeContext.decodeAudioData(arrayBuffer);
+    } finally {
+      decodeContext.close().catch(() => {});
+    }
+    arrayBuffer = null;
+
+    const mp3Blob = await encodeMp3Mono(audioBuffer, MP3_BITRATE_KBPS);
+    audioBuffer = null;
+
+    const objectUrl = URL.createObjectURL(mp3Blob);
+    objectUrls.add(objectUrl);
+
+    const filename = (completedRecording.filename || 'tab-audio.webm').replace(/\.webm$/i, '.mp3');
+
+    return {
+      ok: true,
+      recording: {
+        objectUrl,
+        filename,
+        mimeType: 'audio/mpeg',
+        size: mp3Blob.size,
+        durationMs: completedRecording.durationMs,
+        startedAt: completedRecording.startedAt,
+        finishedAt: completedRecording.finishedAt,
+        title: completedRecording.title,
+        pageUrl: completedRecording.pageUrl,
+        tabId: completedRecording.tabId
+      }
+    };
+  } catch (error) {
+    // 解码 / 编码失败(常见于超长录音内存不足)——保留原 WebM，让用户回退导出。
+    throw new Error(error?.name === 'EncodingError' ? t('errTranscodeFailed') : (error?.message || t('errTranscodeFailed')));
+  }
+}
+
+// 降混单声道 + 转 Int16 + lamejs 编码。分块并周期性让出，避免长时间独占线程。
+async function encodeMp3Mono(audioBuffer, kbps) {
+  if (typeof lamejs === 'undefined' || !lamejs.Mp3Encoder) {
+    throw new Error(t('errTranscodeFailed'));
+  }
+
+  const length = audioBuffer.length;
+  const channelCount = audioBuffer.numberOfChannels;
+  const left = audioBuffer.getChannelData(0);
+  const right = channelCount > 1 ? audioBuffer.getChannelData(1) : null;
+
+  const pcm = new Int16Array(length);
+  for (let i = 0; i < length; i++) {
+    let sample = right ? (left[i] + right[i]) * 0.5 : left[i];
+    if (sample > 1) sample = 1;
+    else if (sample < -1) sample = -1;
+    pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+
+  const encoder = new lamejs.Mp3Encoder(1, audioBuffer.sampleRate, kbps);
+  const blockSize = 1152;
+  const parts = [];
+  let processedBlocks = 0;
+
+  for (let offset = 0; offset < pcm.length; offset += blockSize) {
+    const block = pcm.subarray(offset, offset + blockSize);
+    const encoded = encoder.encodeBuffer(block);
+    if (encoded.length > 0) {
+      parts.push(encoded);
+    }
+
+    if (++processedBlocks % 800 === 0) {
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+  }
+
+  const flushed = encoder.flush();
+  if (flushed.length > 0) {
+    parts.push(flushed);
+  }
+
+  return new Blob(parts, { type: 'audio/mpeg' });
 }
 
 function downloadObjectUrl(objectUrl, filename) {

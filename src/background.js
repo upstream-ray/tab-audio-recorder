@@ -504,23 +504,56 @@ async function exportRecording() {
     return { ok: false, error: t('errNothingToExportYet') };
   }
 
+  const exportFormat = await getExportFormat();
+
   const readyStatus = buildReadyStatus(recording);
   const exportingStatus = { ...readyStatus, state: 'exporting' };
   await setStatusBadge(exportingStatus);
   await broadcastStatus(exportingStatus);
 
-  let downloadResult;
-  try {
-    downloadResult = await downloadRecording(recording);
-  } catch (error) {
+  const restoreReady = async () => {
     readyRecording = recording;
     await setStatusBadge(readyStatus);
     await broadcastStatus(readyStatus);
+  };
+
+  // 默认导出原始 WebM；选了 MP3 才让 offscreen 转码后下载转码产物。
+  let target = recording;
+  let originalObjectUrl = null;
+
+  if (exportFormat === 'mp3') {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        target: 'offscreen',
+        type: 'TRANSCODE_RECORDING',
+        format: 'mp3'
+      });
+
+      if (!response?.ok || !response.recording?.objectUrl) {
+        throw new Error(response?.error || t('errTranscodeFailed'));
+      }
+
+      target = response.recording;
+      originalObjectUrl = recording.objectUrl;
+    } catch (error) {
+      await restoreReady();
+      throw error;
+    }
+  }
+
+  let downloadResult;
+  try {
+    downloadResult = await downloadRecording(target);
+  } catch (error) {
+    await restoreReady();
     throw error;
   }
 
   readyRecording = null;
   await clearReadyRecording(recording.objectUrl);
+  if (originalObjectUrl) {
+    await revokeOffscreenObjectUrl(originalObjectUrl);
+  }
 
   const status = { state: 'idle' };
   await setStatusBadge(status);
@@ -531,8 +564,29 @@ async function exportRecording() {
     status,
     downloadId: downloadResult.downloadId,
     downloadMethod: downloadResult.method,
-    recording: toPublicRecording(recording)
+    recording: toPublicRecording(target)
   };
+}
+
+async function getExportFormat() {
+  try {
+    const { exportFormat } = await chrome.storage.local.get('exportFormat');
+    return exportFormat === 'mp3' ? 'mp3' : 'webm';
+  } catch (error) {
+    return 'webm';
+  }
+}
+
+async function revokeOffscreenObjectUrl(objectUrl) {
+  try {
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'REVOKE_OBJECT_URL',
+      objectUrl
+    });
+  } catch (error) {
+    // offscreen 文档可能已经关闭。
+  }
 }
 
 async function resetAll() {

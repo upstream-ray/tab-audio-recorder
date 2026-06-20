@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """打包 Chrome 扩展为 Web Store 可上传的 zip（强制正斜杠路径）。"""
+import json
 import os
 import zipfile
 
-OUT = "dist/tab-audio-recorder-0.1.0.zip"
+with open("manifest.json", encoding="utf-8") as mf:
+    VERSION = json.load(mf)["version"]
+
+OUT = f"dist/tab-audio-recorder-{VERSION}.zip"
 INCLUDE_ROOT = ["manifest.json"]
 INCLUDE_DIRS = ["src", "icons", "_locales"]
 BACKSLASH = chr(92)

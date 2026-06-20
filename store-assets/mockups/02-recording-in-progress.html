@@ -2,82 +2,104 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f7f9fc;--panel:#ffffff;--ink:#162033;--muted:#607089;--line:#dce3ed;
-  --primary:#1456d9;--danger:#c5221f;--ok:#16833a;--warn:#b36200;
+  --bg:#ffffff;--surface:#f5f5f7;--surface-strong:#f0f0f2;--ink:#1d1d1f;--muted:#86868b;
+  --hairline:rgba(60,60,67,.12);--primary:#0071e3;--primary-tint:#eef4ff;
+  --danger:#ff3b30;--danger-tint:#ffeceb;--ok:#34c759;--toggle-off:#e3e3e8;
+  --disabled-bg:#f0f0f2;--disabled-ink:#c5c5c7;
 }
 html,body{width:1280px;height:800px}
-body{
-  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-  background:linear-gradient(160deg,#eef3fb 0%,#e6ecf6 100%);
-  color:var(--ink);overflow:hidden;
-}
-.stage{width:1280px;height:800px;display:flex;align-items:center;
-  justify-content:space-between;padding:0 96px;position:relative}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei",sans-serif;
+  background:linear-gradient(165deg,#fbfbfd 0%,#eef0f3 100%);color:var(--ink);overflow:hidden;
+  -webkit-font-smoothing:antialiased}
+body.dark{background:linear-gradient(165deg,#222226 0%,#141416 100%);color:#f5f5f7}
+.stage{width:1280px;height:800px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 100px;position:relative}
 /* 左侧文案 */
-.copy{max-width:520px}
-.copy h2{font-size:52px;line-height:1.18;font-weight:800;letter-spacing:-1px}
-.copy p{font-size:22px;line-height:1.55;color:#46566e;margin-top:22px}
-.badges{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap}
-.badge{font-size:16px;font-weight:700;padding:9px 16px;border-radius:999px;
-  background:#fff;border:1px solid var(--line);color:#34465f}
-.badge.blue{color:var(--primary);border-color:#bcd0f3}
-.badge.green{color:var(--ok);border-color:#bfe3c9}
+.copy{max-width:540px}
+.copy h2{font-size:54px;line-height:1.14;font-weight:600;letter-spacing:-1.4px;color:var(--ink)}
+body.dark .copy h2{color:#f5f5f7}
+.copy p{font-size:21px;line-height:1.6;color:#5b5b60;margin-top:24px;font-weight:400}
+body.dark .copy p{color:#a9a9b0}
+.badges{display:flex;gap:10px;margin-top:36px;flex-wrap:wrap}
+.badge{font-size:15px;font-weight:500;padding:9px 16px;border-radius:999px;background:#fff;
+  border:.5px solid rgba(0,0,0,.1);color:#1d1d1f;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.badge.blue{color:#0071e3}.badge.green{color:#1a8f3c}
+body.dark .badge{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14);color:#f5f5f7}
+body.dark .badge.blue{color:#5aacff}body.dark .badge.green{color:#5fd97f}
 /* 浏览器窗口 mockup 容器 */
-.window{width:430px;background:#fff;border-radius:16px;
-  box-shadow:0 30px 70px rgba(22,40,80,.20);overflow:hidden;border:1px solid #e3e9f2}
-.winbar{height:46px;background:#f1f4f9;display:flex;align-items:center;
-  padding:0 16px;gap:8px;border-bottom:1px solid #e3e9f2}
+.window{width:430px;background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(20,30,60,.22);
+  overflow:hidden;border:.5px solid rgba(0,0,0,.06)}
+.window.dark{background:#1c1c1e;border-color:rgba(255,255,255,.08);box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.winbar{height:46px;background:#f6f6f8;display:flex;align-items:center;padding:0 16px;gap:8px;
+  border-bottom:.5px solid rgba(0,0,0,.06)}
+.window.dark .winbar{background:#2a2a2c;border-color:rgba(255,255,255,.07)}
 .dot{width:11px;height:11px;border-radius:50%}
 .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
-.url{flex:1;margin-left:14px;height:26px;background:#fff;border:1px solid #e0e6ef;
-  border-radius:7px;display:flex;align-items:center;padding:0 12px;
-  font-size:13px;color:#7a889c}
-/* ---- 真实 popup（放大 1.18x 以便商店展示） ---- */
-.popwrap{padding:26px;display:flex;justify-content:center;background:var(--bg)}
-.popup{width:350px;padding:14px;background:var(--bg);font-size:14px;
-  transform:scale(1.18);transform-origin:top center}
-.topbar{display:flex;align-items:flex-start;justify-content:space-between;
-  gap:12px;margin-bottom:12px}
-.brand{display:flex;align-items:flex-start;gap:10px;min-width:0}
-.status-dot{width:10px;height:10px;border-radius:999px;background:var(--muted);margin-top:7px}
-.status-dot.recording{background:var(--danger);box-shadow:0 0 0 4px rgba(197,34,31,.12)}
-.status-dot.paused{background:var(--warn);box-shadow:0 0 0 4px rgba(179,98,0,.12)}
+.url{flex:1;margin-left:14px;height:26px;background:#fff;border:.5px solid rgba(0,0,0,.08);border-radius:7px;
+  display:flex;align-items:center;padding:0 12px;font-size:13px;color:#86868b}
+.window.dark .url{background:#1c1c1e;border-color:rgba(255,255,255,.1);color:#98989f}
+/* ---- 真实 popup（放大 1.22x 以便商店展示） ---- */
+.popwrap{padding:30px 22px;display:flex;justify-content:center;background:var(--bg)}
+.window.dark .popwrap{background:#1c1c1e}
+.popup{width:340px;padding:4px 2px;font-size:14px;zoom:1.12}
+.popup.dark{--bg:#1c1c1e;--surface:#2c2c2e;--surface-strong:#3a3a3c;--ink:#f5f5f7;--muted:#98989f;
+  --hairline:rgba(255,255,255,.1);--primary:#0a84ff;--primary-tint:rgba(10,132,255,.22);
+  --danger:#ff453a;--danger-tint:rgba(255,69,58,.22);--ok:#30d158;--toggle-off:#39393d;
+  --disabled-bg:#2c2c2e;--disabled-ink:#5a5a5e;color:#f5f5f7}
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 auto}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+.status-dot.recording{background:var(--danger);box-shadow:0 0 0 4px rgba(255,59,48,.16)}
+.status-dot.paused{background:#ff9f0a;box-shadow:0 0 0 4px rgba(255,159,10,.16)}
 .status-dot.ready{background:var(--ok)}
-.popup h1{font-size:18px;line-height:1.25;font-weight:700}
-#statusText{color:var(--muted);margin-top:3px;line-height:1.4;font-size:14px}
-.timer{min-width:64px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;
-  background:var(--panel);font-variant-numeric:tabular-nums;text-align:center}
-.info-panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
-.info-row{display:grid;grid-template-columns:82px minmax(0,1fr);gap:10px;
-  padding:10px 12px;border-bottom:1px solid var(--line)}
-.info-row:last-child{border-bottom:0}
-.info-row span{color:var(--muted)}
-.info-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
-.setting-row{display:flex;align-items:center;justify-content:space-between;
-  margin-top:10px;padding:0 2px;font-size:13px;color:var(--muted)}
-.toggle{position:relative;width:36px;height:20px;flex:0 0 auto}
-.toggle-track{position:absolute;inset:0;background:var(--line);border-radius:10px}
-.toggle-track::before{content:'';position:absolute;width:16px;height:16px;left:2px;bottom:2px;
-  background:#fff;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.15)}
-.toggle.on .toggle-track{background:var(--primary)}
+.popup h1{font-size:16px;line-height:1.2;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+#statusText{color:var(--muted);margin-top:1px;line-height:1.3;font-size:12px}
+.statusText.rec{color:var(--danger)}
+.timer{font-size:30px;font-weight:300;line-height:1;letter-spacing:.01em;color:var(--ink);
+  font-variant-numeric:tabular-nums;flex:0 0 auto}
+.icon-btn{width:30px;height:30px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:8px;color:var(--muted)}
+.info-panel{background:var(--surface);border-radius:13px;overflow:hidden}
+.info-row{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:9px 14px;font-size:13.5px}
+.info-row:not(:first-child)::before{content:'';position:absolute;top:0;left:14px;right:0;height:.5px;background:var(--hairline)}
+.info-row span{color:var(--muted);flex:0 0 auto}
+.info-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--ink)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;
+  padding:0 2px;font-size:13.5px;color:var(--ink)}
+.toggle{position:relative;width:40px;height:24px;flex:0 0 auto}
+.toggle-track{position:absolute;inset:0;background:var(--toggle-off);border-radius:12px}
+.toggle-track::before{content:'';position:absolute;width:20px;height:20px;left:2px;bottom:2px;background:#fff;
+  border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle.on .toggle-track{background:var(--ok)}
 .toggle.on .toggle-track::before{transform:translateX(16px)}
 .actions{display:grid;gap:8px;margin-top:12px}
-.btn{width:100%;min-height:40px;border:0;border-radius:8px;background:var(--primary);
-  color:#fff;font:inherit;font-weight:700;display:flex;align-items:center;justify-content:center}
-.btn.danger{background:var(--danger)}
-.btn.secondary{background:#4f627a}
-.btn.success{background:var(--ok)}
-.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);
-  font-weight:600;min-height:34px}
-.btn.dis{opacity:.55}
-.message{min-height:20px;margin-top:10px;color:var(--muted);line-height:1.45;font-size:13px}
-.message.warning{color:var(--warn)}
-.message.ok{color:var(--ok)}
-</style></head><body>
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{width:100%;min-height:42px;border-radius:12px;font-weight:500;font-size:15px;display:flex;
+  align-items:center;justify-content:center;background:var(--primary);color:#fff}
+.pair .btn{min-height:40px;font-size:14px}
+.btn.dis{background:var(--disabled-bg);color:var(--disabled-ink)}
+.btn.tint-blue{background:var(--primary-tint);color:var(--primary)}
+.btn.tint-red{background:var(--danger-tint);color:var(--danger)}
+.btn.ghost{background:transparent;color:var(--muted);min-height:32px;font-size:13px;font-weight:400}
+.message{min-height:18px;margin-top:10px;color:var(--muted);line-height:1.45;font-size:12.5px;text-align:center}
+.message.warning{color:#ff9f0a}.message.ok{color:var(--ok)}
+/* 设置子页面 */
+.settings-bar{display:flex;align-items:center;gap:6px;margin-bottom:14px}
+.settings-title{font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.group-label{font-size:12px;color:var(--muted);margin:0 0 6px 6px}
+.group-gap{height:14px}
+.opt-list{background:var(--surface);border-radius:13px;overflow:hidden}
+.opt-row{position:relative;display:flex;align-items:center;justify-content:space-between;padding:11px 14px;
+  font-size:14px;color:var(--ink)}
+.opt-row:not(:first-child)::before{content:'';position:absolute;top:0;left:14px;right:0;height:.5px;background:var(--hairline)}
+.opt-check{color:var(--primary);font-weight:600}
+.muted-val{color:var(--muted)}
+</style></head><body class="">
 <div class="stage"><div class="copy"><h2>边听边录，<br>声音不打断</h2>
-       <p>录音期间标签页声音照常播放，你可以一边正常收听，一边把它录下来。</p>
+       <p>录音期间标签页声音照常播放，关闭弹窗也不会中断，随时暂停再继续。</p>
        <div class="badges"><span class="badge">实时计时</span>
-       <span class="badge blue">仅当前标签页</span></div></div>
+       <span class="badge blue">仅当前标签页</span><span class="badge">暂停 / 继续</span></div></div>
 <div class="window">
   <div class="winbar"><span class="dot r"></span><span class="dot y"></span>
     <span class="dot g"></span><div class="url">video.example.com/lecture</div></div>
@@ -85,23 +107,24 @@ body{
     <header class="topbar">
       <div class="brand">
         <span class="status-dot recording"></span>
-        <div><h1>标签页录音</h1><p id="statusText">正在录制</p></div>
+        <div><h1>标签页录音</h1><p id="statusText" class="statusText rec">录制中</p></div>
       </div>
-      <output class="timer">12:48</output>
+      <div class="timer">12:48</div>
+      <span class="icon-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
     </header>
     <section class="info-panel">
       <div class="info-row"><span>当前标签页</span><strong>直播回放 · 技术分享</strong></div>
       <div class="info-row"><span>输出格式</span><strong>WebM / Opus</strong></div>
       <div class="info-row"><span>保存方式</span><strong>手动导出</strong></div>
-      <div class="info-row"><span>文件状态</span><strong>录制中</strong></div>
+      <div class="info-row"><span>文件状态</span><strong>缓冲中 · 18.6 MB</strong></div>
     </section>
-    <div class="setting-row"><span>标签页静音时自动暂停录音</span>
+    <div class="setting-row"><span>标签页静音时自动暂停</span>
       <span class="toggle on"><span class="toggle-track"></span></span></div>
     <div class="actions">
-      <div class="btn dis">开始录制当前标签页</div><div class="btn secondary">暂停录制</div><div class="btn danger">停止录制</div><div class="btn success dis">导出录音文件</div>
+      <div class="btn dis">开始录制当前标签页</div>
+      <div class="pair"><div class="btn tint-blue">暂停录制</div><div class="btn tint-red">停止录制</div></div>
+      <div class="btn dis">导出录音文件</div>
       <div class="btn ghost">重置</div>
     </div>
-    <p class="message ">录音进行中，可关闭弹窗，录制不会中断。</p>
-  </div></div>
-</div></div>
-</body></html>
+    <p class="message ">录音进行中，可关闭弹窗，录制不会中断。</p></div></div>
+</div></div></body></html>

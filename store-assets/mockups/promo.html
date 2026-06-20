@@ -1,24 +1,27 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:440px;height:280px}
-body{font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-  background:linear-gradient(150deg,#f3f7fd 0%,#e7edf7 100%);color:#162033;
-  display:flex;flex-direction:column;justify-content:center;padding:30px 32px;overflow:hidden}
-.row{display:flex;align-items:center;gap:14px}
-.logo{width:54px;height:54px;border-radius:13px;background:linear-gradient(150deg,#1456d9,#16833a);
-  position:relative;flex:0 0 auto;box-shadow:0 6px 16px rgba(20,86,217,.28)}
-.logo::before{content:'';position:absolute;left:14px;bottom:14px;width:6px;height:14px;
-  background:#fff;box-shadow:9px 0 0 #fff,18px 4px 0 #fff;border-radius:2px}
-.logo::after{content:'';position:absolute;right:11px;top:11px;width:9px;height:9px;
-  border-radius:50%;background:#ff5f57}
-h1{font-size:27px;font-weight:800;line-height:1.15;letter-spacing:-.5px}
-.tag{font-size:16px;color:#46566e;margin-top:16px;line-height:1.5}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei",sans-serif;
+  background:linear-gradient(150deg,#fbfbfd 0%,#eceef2 100%);color:#1d1d1f;
+  display:flex;flex-direction:column;justify-content:center;padding:32px 34px;overflow:hidden;
+  -webkit-font-smoothing:antialiased}
+.row{display:flex;align-items:center;gap:15px}
+.logo{width:58px;height:58px;border-radius:15px;background:linear-gradient(160deg,#0a84ff 0%,#0060d6 100%);
+  position:relative;flex:0 0 auto;box-shadow:0 8px 20px rgba(0,113,227,.32)}
+.bars{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;align-items:flex-end;gap:4px;height:22px}
+.bars i{width:5px;border-radius:2.5px;background:#fff;display:block}
+.bars i:nth-child(1){height:11px}.bars i:nth-child(2){height:22px}.bars i:nth-child(3){height:15px}
+.logo::after{content:'';position:absolute;right:11px;top:11px;width:9px;height:9px;border-radius:50%;
+  background:#ff453a;box-shadow:0 0 0 3px rgba(255,69,58,.25)}
+h1{font-size:27px;font-weight:600;line-height:1.15;letter-spacing:-.6px}
+.tag{font-size:15.5px;color:#5b5b60;margin-top:16px;line-height:1.55}
 .badges{display:flex;gap:9px;margin-top:18px}
-.b{font-size:13px;font-weight:700;padding:7px 13px;border-radius:999px;background:#fff;border:1px solid #d6e0ef}
-.b.blue{color:#1456d9}.b.green{color:#16833a}
+.b{font-size:13px;font-weight:500;padding:7px 13px;border-radius:999px;background:#fff;
+  border:.5px solid rgba(0,0,0,.1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.b.blue{color:#0071e3}.b.green{color:#1a8f3c}
 </style></head><body>
-<div class="row"><div class="logo"></div><h1>标签页录音</h1></div>
-<p class="tag">一键录制当前标签页音频，本地保存为 WebM/Opus。</p>
-<div class="badges"><span class="b blue">WebM / Opus</span>
+<div class="row"><div class="logo"><span class="bars"><i></i><i></i><i></i></span></div><h1>标签页录音</h1></div>
+<p class="tag">一键录制当前标签页，本地导出 WebM/Opus 或 MP3。深色模式 · 简繁英。</p>
+<div class="badges"><span class="b blue">MP3 / WebM</span>
 <span class="b green">不上传</span><span class="b">不录麦克风</span></div>
 </body></html>

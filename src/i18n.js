@@ -9,7 +9,8 @@
   const SUPPORTED = ['en', 'zh_CN'];
   const FALLBACK = 'en';
   const tables = {}; // lang -> 原始 messages.json 对象
-  let current = guessFromBrowser();
+  let current = guessFromBrowser(); // 当前实际生效语言
+  let pref = 'auto'; // 用户偏好：'auto'(跟随系统) | 'en' | 'zh_CN'
 
   function guessFromBrowser() {
     // chrome.i18n 在 offscreen document 里不可用，访问会抛错，需容错回退。
@@ -53,20 +54,42 @@
   const ready = (async () => {
     try {
       const { uiLang } = await chrome.storage.local.get('uiLang');
-      if (uiLang && SUPPORTED.includes(uiLang)) current = uiLang;
+      if (uiLang && SUPPORTED.includes(uiLang)) {
+        pref = uiLang;
+        current = uiLang;
+      } else {
+        // 无偏好或存的是 'auto' —— 跟随系统语言。
+        pref = 'auto';
+        current = guessFromBrowser();
+      }
     } catch (error) {
       // storage 不可用时退回浏览器语言推断。
+      pref = 'auto';
+      current = guessFromBrowser();
     }
     await loadTable(current);
     if (current !== FALLBACK) await loadTable(FALLBACK);
   })();
 
+  // lang 可为 'auto'(跟随系统) 或具体语言码。
   async function setLang(lang) {
-    if (!SUPPORTED.includes(lang) || lang === current) return;
-    await loadTable(lang);
-    current = lang;
+    let nextPref;
+    let nextLang;
+    if (lang === 'auto') {
+      nextPref = 'auto';
+      nextLang = guessFromBrowser();
+    } else if (SUPPORTED.includes(lang)) {
+      nextPref = lang;
+      nextLang = lang;
+    } else {
+      return;
+    }
+    if (nextPref === pref && nextLang === current) return;
+    await loadTable(nextLang);
+    pref = nextPref;
+    current = nextLang;
     try {
-      await chrome.storage.local.set({ uiLang: lang });
+      await chrome.storage.local.set({ uiLang: nextPref });
     } catch (error) {
       // 偏好持久化失败不影响本次切换。
     }
@@ -84,6 +107,9 @@
     SUPPORTED,
     get lang() {
       return current;
+    },
+    get pref() {
+      return pref;
     }
   };
 })();

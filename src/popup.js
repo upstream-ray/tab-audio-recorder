@@ -16,20 +16,32 @@ function localizeStatic() {
   }
 }
 
-function setupLangSwitch() {
-  const buttons = document.querySelectorAll('#langSwitch [data-lang]');
+function setupSettings() {
+  const settingsButton = document.getElementById('settingsButton');
+  const backButton = document.getElementById('backButton');
+  const mainView = document.getElementById('mainView');
+  const settingsView = document.getElementById('settingsView');
+  const langButtons = document.querySelectorAll('#langOptions [data-lang]');
+
+  const showSettings = (open) => {
+    mainView.hidden = open;
+    settingsView.hidden = !open;
+  };
+
+  settingsButton.addEventListener('click', () => showSettings(true));
+  backButton.addEventListener('click', () => showSettings(false));
 
   const syncActive = () => {
-    for (const button of buttons) {
-      button.classList.toggle('active', button.dataset.lang === I18N.lang);
+    for (const button of langButtons) {
+      button.classList.toggle('active', button.dataset.lang === I18N.pref);
     }
   };
 
   syncActive();
 
-  for (const button of buttons) {
+  for (const button of langButtons) {
     button.addEventListener('click', async () => {
-      if (button.dataset.lang === I18N.lang) {
+      if (button.dataset.lang === I18N.pref) {
         return;
       }
       await I18N.setLang(button.dataset.lang);
@@ -64,7 +76,7 @@ let timerId;
 document.addEventListener('DOMContentLoaded', async () => {
   await I18N.ready;
   localizeStatic();
-  setupLangSwitch();
+  setupSettings();
 
   els.startButton.addEventListener('click', onStartClick);
   els.pauseButton.addEventListener('click', onPauseClick);

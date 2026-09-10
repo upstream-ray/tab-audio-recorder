@@ -10,13 +10,16 @@
 - Confirm the exported file plays in Chrome or VLC
 - Test keyboard shortcuts
 - Test a muted tab and confirm the extension shows a clear error
+- Kill the browser mid-recording, reopen it, and confirm the recording is listed as interrupted and still exports
+- Pause a recording, restart the browser, use Continue on that recording, then export MP3 and confirm one continuous file
+- Delete a recording from the list and confirm local storage usage drops
 - Confirm no network requests are made by the extension (including MP3 export)
-- Verify the settings page: switch language (English / 简体中文 / 繁體中文 / follow system), theme (light / dark / follow system), and export format (WebM / MP3)
+- Verify the settings page: switch language (English / 简体中文 / 繁體中文 / follow system), theme (light / dark / follow system), export format (WebM / MP3), and the "keep lossless WebM" toggle
 - Verify localization across the three shipped locales `_locales/en`, `_locales/zh_CN`, `_locales/zh_TW`, with `en` as `default_locale`
 
 ## Build
 
-Run `python build.py` to produce `dist/tab-audio-recorder-<version>.zip` (the version is read from `manifest.json`, currently 0.2.0). The script forces forward-slash paths inside the zip (Windows `Compress-Archive` writes backslashes, which Chrome rejects) and includes only `manifest.json`, `src/`, `icons/`, and `_locales/`. Note `src/vendor/lame.min.js` (LGPL-3.0) and its `.LICENSE` ship inside `src/`.
+Run `python build.py` to produce `dist/tab-audio-recorder-<version>.zip` (the version is read from `manifest.json`, currently 0.3.0). The script forces forward-slash paths inside the zip (Windows `Compress-Archive` writes backslashes, which Chrome rejects) and includes only `manifest.json`, `src/`, `icons/`, and `_locales/`. Note `src/vendor/lame.min.js` (LGPL-3.0) and its `.LICENSE` ship inside `src/`.
 
 ## Upload Package
 

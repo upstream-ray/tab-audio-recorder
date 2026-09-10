@@ -1,3 +1,6 @@
+// Popup UI —— 纯展示层。所有动作都委托给 background，状态通过 STATUS_CHANGED 广播被动更新。
+// 录音数据本身在 IndexedDB 里，popup 只拿 background 汇总好的会话列表。
+
 const t = (key, subs) => I18N.t(key, subs);
 
 function localizeStatic() {
@@ -72,7 +75,7 @@ function setupSettings() {
       await I18N.setLang(button.dataset.lang);
       syncLangActive();
       localizeStatic();
-      renderStatus(currentStatus);
+      render();
       setMessage('');
     });
   }
@@ -119,7 +122,7 @@ function setupSettings() {
       }
       exportFormat = button.dataset.format;
       syncFormatActive();
-      renderStatus(currentStatus);
+      render();
       try {
         await chrome.storage.local.set({ exportFormat });
       } catch (error) {
@@ -135,20 +138,26 @@ const els = {
   timer: document.getElementById('timer'),
   tabTitle: document.getElementById('tabTitle'),
   formatText: document.getElementById('formatText'),
-  fileState: document.getElementById('fileState'),
+  usageText: document.getElementById('usageText'),
   startButton: document.getElementById('startButton'),
   pauseButton: document.getElementById('pauseButton'),
   stopButton: document.getElementById('stopButton'),
-  exportButton: document.getElementById('exportButton'),
   resetButton: document.getElementById('resetButton'),
   message: document.getElementById('message'),
-  autoSyncToggle: document.getElementById('autoSyncToggle')
+  autoSyncToggle: document.getElementById('autoSyncToggle'),
+  keepWebmToggle: document.getElementById('keepWebmToggle'),
+  sessionList: document.getElementById('sessionList'),
+  sessionsEmpty: document.getElementById('sessionsEmpty'),
+  sessionsLabel: document.getElementById('sessionsLabel')
 };
 
 let currentStatus = { state: 'idle' };
+let sessions = [];
+let usage = { count: 0, bytes: 0 };
 let statusReceivedAt = Date.now();
 let timerId;
 let exportFormat = 'webm';
+let busy = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await I18N.ready;
@@ -160,15 +169,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   els.startButton.addEventListener('click', onStartClick);
   els.pauseButton.addEventListener('click', onPauseClick);
   els.stopButton.addEventListener('click', onStopClick);
-  els.exportButton.addEventListener('click', onExportClick);
   els.resetButton.addEventListener('click', onResetClick);
   els.autoSyncToggle.addEventListener('change', onAutoSyncChange);
+  els.keepWebmToggle.addEventListener('change', onKeepWebmChange);
 
-  loadAutoSyncState();
+  loadSettings();
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.target === 'popup' && message?.type === 'STATUS_CHANGED') {
-      renderStatus(message.status || { state: 'idle' });
+      applySnapshot(message);
       if (message.notice?.text) {
         setMessage(message.notice.text, message.notice.level || '');
       }
@@ -183,13 +192,15 @@ window.addEventListener('unload', () => {
   clearInterval(timerId);
 });
 
+/* ---------- 主控操作 ---------- */
+
 async function onStartClick() {
   setBusy(true);
   setMessage(t('msgStarting'));
 
   try {
     const response = await sendMessage({ target: 'background', type: 'START_RECORDING' });
-    renderStatus(response.status);
+    applySnapshot(response);
 
     if (response.warning) {
       setMessage(response.warning, 'warning');
@@ -214,7 +225,7 @@ async function onPauseClick() {
       target: 'background',
       type: isPaused ? 'RESUME_RECORDING' : 'PAUSE_RECORDING'
     });
-    renderStatus(response.status);
+    applySnapshot(response);
     setMessage(isPaused ? t('msgResumed') : t('msgPaused'));
   } catch (error) {
     setMessage(error.message, 'error');
@@ -230,13 +241,8 @@ async function onStopClick() {
 
   try {
     const response = await sendMessage({ target: 'background', type: 'STOP_RECORDING' });
-    renderStatus(response.status);
-
-    if (response.recording?.filename) {
-      setMessage(t('msgRecordingSaved', [response.recording.filename]));
-    } else {
-      setMessage(response.message || t('msgNoOngoingRecording'));
-    }
+    applySnapshot(response);
+    setMessage(response.session ? t('msgSessionSaved') : (response.message || t('msgNoOngoingRecording')));
   } catch (error) {
     setMessage(error.message, 'error');
     await refreshStatus();
@@ -245,16 +251,70 @@ async function onStopClick() {
   }
 }
 
-async function onExportClick() {
+async function onResetClick() {
+  const state = currentStatus.state;
+  const confirmText = state === 'recording' || state === 'paused'
+    ? t('confirmResetRecording')
+    : t('confirmResetDefault');
+
+  if (!confirm(confirmText)) {
+    return;
+  }
+
   setBusy(true);
-  setMessage(exportFormat === 'mp3' ? t('msgConvertingMp3') : t('msgExporting'));
+  setMessage(t('msgResetting'));
 
   try {
-    const response = await sendMessage({ target: 'background', type: 'EXPORT_RECORDING' });
-    renderStatus(response.status);
+    const response = await sendMessage({ target: 'background', type: 'RESET_ALL' });
+    applySnapshot(response);
+    setMessage(t('msgResetDone'));
+  } catch (error) {
+    setMessage(error.message, 'error');
+    await refreshStatus();
+  } finally {
+    setBusy(false);
+  }
+}
 
-    if (response.recording?.filename) {
-      setMessage(t('msgSentToDownloads', [response.recording.filename]));
+/* ---------- 录音记录操作 ---------- */
+
+async function onResumeSession(sessionId) {
+  setBusy(true);
+  setMessage(t('msgResumingSession'));
+
+  try {
+    const response = await sendMessage({
+      target: 'background',
+      type: 'START_RECORDING',
+      sessionId
+    });
+    applySnapshot(response);
+    setMessage(response.warning || t('msgSessionResumed'), response.warning ? 'warning' : '');
+  } catch (error) {
+    setMessage(error.message, 'error');
+    await refreshStatus();
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function onExportSession(sessionId) {
+  setBusy(true);
+  setMessage(t('msgExporting'));
+
+  try {
+    const response = await sendMessage({
+      target: 'background',
+      type: 'EXPORT_SESSION',
+      sessionId
+    });
+    applySnapshot(response);
+
+    const files = response.files || [];
+    if (files.length > 1) {
+      setMessage(t('msgSentToDownloadsMulti', [String(files.length)]), 'warning');
+    } else if (files.length === 1) {
+      setMessage(t('msgSentToDownloads', [files[0].filename]));
     } else {
       setMessage(t('msgNothingToExport'), 'warning');
     }
@@ -266,26 +326,28 @@ async function onExportClick() {
   }
 }
 
-async function onResetClick() {
-  const state = currentStatus.state;
-  let confirmText = t('confirmResetDefault');
-  if (state === 'recording' || state === 'paused') {
-    confirmText = t('confirmResetRecording');
-  } else if (state === 'ready') {
-    confirmText = t('confirmResetReady');
-  }
+async function onDeleteSession(sessionId) {
+  const session = sessions.find((item) => item.id === sessionId);
+  const label = session?.title || '';
+  const warn = session && !session.lastExportAt
+    ? t('confirmDeleteUnexported', [label])
+    : t('confirmDeleteSession', [label]);
 
-  if (!confirm(confirmText)) {
+  if (!confirm(warn)) {
     return;
   }
 
   setBusy(true);
-  setMessage(t('msgResetting'));
+  setMessage(t('msgDeleting'));
 
   try {
-    const response = await sendMessage({ target: 'background', type: 'RESET_ALL' });
-    renderStatus(response.status);
-    setMessage(t('msgResetDone'));
+    const response = await sendMessage({
+      target: 'background',
+      type: 'DELETE_SESSION',
+      sessionId
+    });
+    applySnapshot(response);
+    setMessage(t('msgDeleted'));
   } catch (error) {
     setMessage(error.message, 'error');
     await refreshStatus();
@@ -293,6 +355,8 @@ async function onResetClick() {
     setBusy(false);
   }
 }
+
+/* ---------- 设置 ---------- */
 
 async function onAutoSyncChange() {
   const enabled = els.autoSyncToggle.checked;
@@ -303,25 +367,38 @@ async function onAutoSyncChange() {
   }
 }
 
-async function loadAutoSyncState() {
+async function onKeepWebmChange() {
+  const enabled = els.keepWebmToggle.checked;
   try {
-    const response = await sendMessage({ target: 'background', type: 'GET_AUTO_SYNC' });
-    els.autoSyncToggle.checked = response.autoSyncEnabled !== false;
+    await sendMessage({ target: 'background', type: 'SET_KEEP_WEBM', enabled });
   } catch (error) {
-    els.autoSyncToggle.checked = true;
+    els.keepWebmToggle.checked = !enabled;
   }
 }
+
+async function loadSettings() {
+  try {
+    const response = await sendMessage({ target: 'background', type: 'GET_SETTINGS' });
+    els.autoSyncToggle.checked = response.autoSyncEnabled !== false;
+    els.keepWebmToggle.checked = response.keepWebm !== false;
+  } catch (error) {
+    els.autoSyncToggle.checked = true;
+    els.keepWebmToggle.checked = true;
+  }
+}
+
+/* ---------- 状态同步 ---------- */
 
 async function refreshStatus() {
   try {
     const response = await sendMessage({ target: 'background', type: 'GET_STATUS' });
-    renderStatus(response.status);
+    applySnapshot(response);
     if (response.notice?.text) {
       setMessage(response.notice.text, response.notice.level || '');
     }
   } catch (error) {
     setMessage(error.message, 'error');
-    renderStatus({ state: 'idle' });
+    applySnapshot({ status: { state: 'idle' }, sessions: [], usage: { count: 0, bytes: 0 } });
   }
 }
 
@@ -335,92 +412,168 @@ async function sendMessage(message) {
   return response;
 }
 
-function renderStatus(status) {
-  currentStatus = status || { state: 'idle' };
+function applySnapshot(snapshot) {
+  currentStatus = snapshot?.status || { state: 'idle' };
+  if (Array.isArray(snapshot?.sessions)) {
+    sessions = snapshot.sessions.filter(Boolean);
+  }
+  if (snapshot?.usage) {
+    usage = snapshot.usage;
+  }
   statusReceivedAt = Date.now();
+  render();
+}
 
-  els.statusDot.classList.toggle('recording', currentStatus.state === 'recording');
-  els.statusDot.classList.toggle('paused', currentStatus.state === 'paused');
-  els.statusDot.classList.toggle('ready', currentStatus.state === 'idle' || currentStatus.state === 'ready');
+/* ---------- 渲染 ---------- */
+
+function render() {
+  renderStatus();
+  renderSessions();
+  updateTimer();
+}
+
+function renderStatus() {
+  const state = currentStatus.state;
+
+  els.statusDot.classList.toggle('recording', state === 'recording');
+  els.statusDot.classList.toggle('paused', state === 'paused');
+  els.statusDot.classList.toggle('ready', state === 'idle');
   els.tabTitle.textContent = currentStatus.title || '-';
   els.formatText.textContent = exportFormat === 'mp3' ? 'MP3' : formatMime(currentStatus.mimeType);
-  els.fileState.textContent = getFileStateText(currentStatus);
+  els.usageText.textContent = usage.count
+    ? t('usageWithCount', [formatBytes(usage.bytes), String(usage.count)])
+    : formatBytes(0);
 
-  if (currentStatus.state === 'recording') {
+  if (busy) {
+    els.startButton.disabled = true;
+    els.pauseButton.disabled = true;
+    els.stopButton.disabled = true;
+    els.resetButton.disabled = true;
+    return;
+  }
+
+  els.resetButton.disabled = false;
+
+  if (state === 'recording') {
     els.statusText.textContent = t('statusRecording');
     els.startButton.disabled = true;
     els.pauseButton.disabled = false;
     els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = false;
-    els.exportButton.disabled = true;
-    els.resetButton.disabled = false;
-  } else if (currentStatus.state === 'paused') {
+  } else if (state === 'paused') {
     els.statusText.textContent = currentStatus.autoPaused ? t('statusAutoPaused') : t('statusPaused');
     els.startButton.disabled = true;
     els.pauseButton.disabled = false;
     els.pauseButton.textContent = t('btnResume');
     els.stopButton.disabled = false;
-    els.exportButton.disabled = true;
-    els.resetButton.disabled = false;
-  } else if (currentStatus.state === 'ready') {
-    els.statusText.textContent = t('statusReadyToExport');
+  } else if (state === 'stopping' || state === 'exporting') {
+    els.statusText.textContent = state === 'exporting' ? t('statusExporting') : t('statusStopping');
     els.startButton.disabled = true;
     els.pauseButton.disabled = true;
     els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = true;
-    els.exportButton.disabled = false;
-    els.resetButton.disabled = false;
-  } else if (currentStatus.state === 'stopping' || currentStatus.state === 'saving' || currentStatus.state === 'exporting') {
-    els.statusText.textContent = currentStatus.state === 'exporting' ? t('statusExporting') : t('statusStopping');
-    els.startButton.disabled = true;
-    els.pauseButton.disabled = true;
-    els.pauseButton.textContent = t('btnPause');
-    els.stopButton.disabled = true;
-    els.exportButton.disabled = true;
-    els.resetButton.disabled = false;
   } else {
     els.statusText.textContent = t('statusIdle');
     els.startButton.disabled = false;
     els.pauseButton.disabled = true;
     els.pauseButton.textContent = t('btnPause');
     els.stopButton.disabled = true;
-    els.exportButton.disabled = true;
-    els.resetButton.disabled = false;
+  }
+}
+
+function renderSessions() {
+  els.sessionsLabel.textContent = sessions.length
+    ? t('sessionsHeadingCount', [String(sessions.length)])
+    : t('sessionsHeading');
+  els.sessionsEmpty.hidden = sessions.length > 0;
+  els.sessionList.textContent = '';
+
+  const recordingNow = ['recording', 'paused', 'stopping'].includes(currentStatus.state);
+
+  for (const session of sessions) {
+    els.sessionList.append(buildSessionRow(session, recordingNow));
+  }
+}
+
+function buildSessionRow(session, recordingNow) {
+  const isActive = recordingNow && session.id === currentStatus.sessionId;
+
+  const row = document.createElement('div');
+  row.className = 'session-item';
+  if (isActive) {
+    row.classList.add('active');
   }
 
-  updateTimer();
+  const main = document.createElement('div');
+  main.className = 'session-main';
+
+  const title = document.createElement('strong');
+  title.className = 'session-title';
+  title.textContent = session.title || t('sessionUntitled');
+  title.title = session.title || '';
+
+  const meta = document.createElement('span');
+  meta.className = 'session-meta';
+  meta.textContent = buildSessionMeta(session, isActive);
+
+  main.append(title, meta);
+
+  const actions = document.createElement('div');
+  actions.className = 'session-actions';
+
+  const resumeButton = document.createElement('button');
+  resumeButton.type = 'button';
+  resumeButton.className = 'chip';
+  resumeButton.textContent = t('btnResumeSession');
+  resumeButton.disabled = busy || recordingNow;
+  resumeButton.addEventListener('click', () => onResumeSession(session.id));
+
+  const exportButton = document.createElement('button');
+  exportButton.type = 'button';
+  exportButton.className = 'chip primary';
+  exportButton.textContent = t('btnExportSession');
+  exportButton.disabled = busy || isActive;
+  exportButton.addEventListener('click', () => onExportSession(session.id));
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'chip danger';
+  deleteButton.textContent = t('btnDeleteSession');
+  deleteButton.disabled = busy || isActive;
+  deleteButton.addEventListener('click', () => onDeleteSession(session.id));
+
+  actions.append(resumeButton, exportButton, deleteButton);
+  row.append(main, actions);
+  return row;
+}
+
+function buildSessionMeta(session, isActive) {
+  const parts = [formatDuration(session.durationMs), formatBytes(session.bytes)];
+
+  if (session.segmentCount > 1) {
+    parts.push(t('sessionSegments', [String(session.segmentCount)]));
+  }
+
+  if (isActive) {
+    parts.push(currentStatus.state === 'paused' ? t('sessionStatePaused') : t('sessionStateRecording'));
+  } else if (session.interrupted) {
+    parts.push(t('sessionStateInterrupted'));
+  } else if (session.state === 'paused') {
+    parts.push(t('sessionStatePaused'));
+  }
+
+  parts.push(session.lastExportAt ? t('sessionExported') : t('sessionNotExported'));
+  return parts.join(' · ');
 }
 
 function updateTimer() {
   const elapsedMs = getDisplayElapsedMs();
-  if (!elapsedMs) {
-    els.timer.textContent = '00:00';
-    return;
-  }
-
-  const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
-
-  const hours = Math.floor(elapsedSeconds / 3600);
-  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-  const seconds = elapsedSeconds % 60;
-  const pad = (value) => String(value).padStart(2, '0');
-
-  els.timer.textContent = hours > 0
-    ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-    : `${pad(minutes)}:${pad(seconds)}`;
+  els.timer.textContent = elapsedMs ? formatDuration(elapsedMs) : '00:00';
 }
 
 function setBusy(isBusy) {
-  if (isBusy) {
-    els.startButton.disabled = true;
-    els.pauseButton.disabled = true;
-    els.stopButton.disabled = true;
-    els.exportButton.disabled = true;
-    els.resetButton.disabled = true;
-    return;
-  }
-
-  renderStatus(currentStatus);
+  busy = isBusy;
+  render();
 }
 
 function setMessage(text, level = '') {
@@ -442,7 +595,7 @@ function formatMime(mimeType) {
 }
 
 function getDisplayElapsedMs() {
-  const baseElapsedMs = currentStatus.elapsedMs || currentStatus.durationMs || 0;
+  const baseElapsedMs = currentStatus.elapsedMs || 0;
   if (currentStatus.state === 'recording') {
     return baseElapsedMs + Date.now() - statusReceivedAt;
   }
@@ -450,20 +603,16 @@ function getDisplayElapsedMs() {
   return baseElapsedMs;
 }
 
-function getFileStateText(status) {
-  if (status.state === 'recording' || status.state === 'paused') {
-    return status.sizeEstimate ? t('fileStateBuffered', [formatBytes(status.sizeEstimate)]) : t('statusRecording');
-  }
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor((ms || 0) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value) => String(value).padStart(2, '0');
 
-  if (status.state === 'ready') {
-    return status.size ? t('fileStateReadySized', [formatBytes(status.size)]) : t('statusReadyToExport');
-  }
-
-  if (status.state === 'exporting') {
-    return t('statusExporting');
-  }
-
-  return t('fileStateNone');
+  return hours > 0
+    ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+    : `${pad(minutes)}:${pad(seconds)}`;
 }
 
 function formatBytes(bytes) {
@@ -475,5 +624,9 @@ function formatBytes(bytes) {
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   }
 
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }

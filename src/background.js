@@ -89,14 +89,19 @@
 
 const t = (key, subs) => I18N.t(key, subs);
 
+// 录音持久化层。service worker 里 importScripts 的相对路径以脚本自身位置为基准，
+// 写成 'src/store.js' 会解析到 src/src/store.js 而静默失败，所以一律用绝对 URL。
+importScripts(chrome.runtime.getURL('src/store.js'));
+
 const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen.html';
 const OFFSCREEN_DOCUMENT_URL = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
 const DOWNLOAD_CLEANUP_TIMEOUT_MS = 10 * 60 * 1000;
 const FALLBACK_DOWNLOAD_CLEANUP_TIMEOUT_MS = 60 * 1000;
 const STOP_RECORDING_TIMEOUT_MS = 30 * 1000;
+const SESSION_SAMPLE_RATE = 48000;
+const MP3_BITRATE_KBPS = 128;
 
 let creatingOffscreenDocument;
-let readyRecording = null;
 let pendingNotice = null;
 const pendingDownloadObjectUrls = new Set();
 const pendingStopRequests = new Map();
@@ -104,6 +109,7 @@ const pendingStopRequests = new Map();
 let activeRecordingTabId = null;
 let autoPaused = false;
 let autoSyncEnabled = true;
+let keepWebmEnabled = true;
 
 chrome.storage.session.get(['autoPaused', 'activeRecordingTabId'], (result) => {
   if (result.autoPaused !== undefined) autoPaused = result.autoPaused;
@@ -120,18 +126,51 @@ function setActiveRecordingTabId(value) {
   chrome.storage.session.set({ activeRecordingTabId: value });
 }
 
-chrome.storage.local.get('autoSyncEnabled', (result) => {
+chrome.storage.local.get(['autoSyncEnabled', 'keepWebm'], (result) => {
   if (result.autoSyncEnabled !== undefined) {
     autoSyncEnabled = result.autoSyncEnabled;
   }
+  if (result.keepWebm !== undefined) {
+    keepWebmEnabled = result.keepWebm !== false;
+  }
 });
 
+// 上次没走正常停止流程（崩溃、直接关浏览器）的会话，state 会停在 'recording'。
+// Service Worker 每次起来先把它们收拢成「已暂停」，用户就能在录音记录里继续或导出。
+let recoveryPromise;
+
+function ensureRecovery() {
+  if (!recoveryPromise) {
+    recoveryPromise = runRecovery().catch((error) => {
+      console.warn('[tab-audio-recorder] session recovery failed:', error);
+      return [];
+    });
+  }
+  return recoveryPromise;
+}
+
+async function runRecovery() {
+  // Service Worker 可能在录音中途被回收再唤醒，此时 offscreen 还在录。
+  // 先问清楚谁在录，别把活着的会话判成中断。
+  let activeSessionId = null;
+  try {
+    const status = await getStatus();
+    if (['recording', 'paused', 'stopping'].includes(status.state)) {
+      activeSessionId = status.sessionId || null;
+    }
+  } catch (error) {
+    // 问不到就按没有活动会话处理。
+  }
+
+  return RecordingStore.recoverInterrupted(activeSessionId);
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  setStatusBadge({ state: 'idle' });
+  ensureRecovery().then(() => setStatusBadge({ state: 'idle' }));
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  setStatusBadge({ state: 'idle' });
+  ensureRecovery().then(() => setStatusBadge({ state: 'idle' }));
 });
 
 if (chrome.commands?.onCommand) {
@@ -147,36 +186,43 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 
 async function handleCommand(command) {
   await I18N.ready;
+  await ensureRecovery();
   try {
+    const status = await getStatus();
+
     if (command === 'toggle-recording') {
-      const status = await getStatus();
       if (status.state === 'recording' || status.state === 'paused') {
         const result = await stopRecording();
         await notifyUser(
           t('notifyStoppedTitle'),
-          result.recording?.filename
-            ? t('notifyStoppedSaved', [result.recording.filename])
+          result.session?.filename
+            ? t('notifyStoppedSaved', [result.session.filename])
             : t('notifyStoppedOpen')
         );
-      } else if (status.state === 'idle') {
-        const result = await startRecording();
-        if (result.ok) {
-          await notifyUser(t('notifyStartTitle'), result.warning || t('notifyStartBody'));
-        } else {
-          await notifyUser(t('notifyCantStartTitle'), result.error || t('notifyCantStartBody'));
-        }
-      } else if (status.state === 'ready') {
-        await notifyUser(t('notifyReadyPendingTitle'), t('notifyReadyPendingBody'));
+        return result;
       }
-    } else if (command === 'toggle-pause') {
-      const status = await getStatus();
+
+      const result = await startRecording();
+      if (result?.ok) {
+        await notifyUser(t('notifyStartTitle'), result.warning || t('notifyStartBody'));
+      } else {
+        await notifyUser(t('notifyCantStartTitle'), result?.error || t('notifyCantStartBody'));
+      }
+      return result;
+    }
+
+    if (command === 'toggle-pause') {
       if (status.state === 'recording') {
-        await pauseRecording();
+        const result = await pauseRecording();
         await notifyUser(t('notifyPausedTitle'), t('notifyPausedBody'));
-      } else if (status.state === 'paused') {
+        return result;
+      }
+
+      if (status.state === 'paused') {
         setAutoPaused(false);
-        await resumeRecording();
+        const result = await resumeRecording();
         await notifyUser(t('notifyResumedTitle'), t('notifyResumedBody'));
+        return result;
       }
     }
   } catch (error) {
@@ -185,76 +231,84 @@ async function handleCommand(command) {
 }
 
 async function notifyUser(title, message) {
-  if (!chrome.notifications?.create) {
+  if (!chrome.notifications) {
     return;
   }
+
   try {
     await chrome.notifications.create({
       type: 'basic',
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
       title,
-      message: message || '',
-      priority: 1
+      message
     });
   } catch (error) {
-    // Notifications may be disabled by the user — fail silently.
+    // 通知失败不影响录音本身。
   }
 }
 
+// 「标签页静音时自动暂停」：页面不出声就暂停，出声了自动接上。
 async function handleTabAudibleChange(audible) {
-  try {
-    const status = await getStatus();
-    if (!audible && status.state === 'recording') {
+  const status = await getStatus();
+
+  if (!audible && status.state === 'recording') {
+    try {
+      await pauseRecording();
       setAutoPaused(true);
-      try {
-        await pauseRecording();
-      } catch (error) {
-        setAutoPaused(false);
-      }
-    } else if (audible && autoPaused && status.state === 'paused') {
-      setAutoPaused(false);
-      await resumeRecording();
+    } catch (error) {
+      // 暂停失败就维持原状。
     }
-  } catch (error) {
-    // Don't disrupt recording for monitoring errors.
+    return;
+  }
+
+  if (audible && status.state === 'paused' && autoPaused) {
+    try {
+      await resumeRecording();
+      setAutoPaused(false);
+    } catch (error) {
+      // 恢复失败就维持原状。
+    }
   }
 }
 
 async function handleStreamSilence() {
+  const status = await getStatus();
+  if (status.state !== 'recording') {
+    return;
+  }
+
   try {
-    const status = await getStatus();
-    if (status.state === 'recording') {
-      setAutoPaused(true);
-      try {
-        await pauseRecording();
-      } catch (error) {
-        setAutoPaused(false);
-      }
-    }
+    await pauseRecording();
+    setAutoPaused(true);
   } catch (error) {
-    // Don't disrupt recording for monitoring errors.
+    // 忽略。
   }
 }
 
 async function handleStreamResumed() {
+  if (!autoPaused) {
+    return;
+  }
+
+  const status = await getStatus();
+  if (status.state !== 'paused') {
+    return;
+  }
+
   try {
-    if (!autoPaused) return;
-    const status = await getStatus();
-    if (status.state === 'paused') {
-      setAutoPaused(false);
-      await resumeRecording();
-    }
+    await resumeRecording();
+    setAutoPaused(false);
   } catch (error) {
-    // Don't disrupt recording for monitoring errors.
+    // 忽略。
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.target && message.target !== 'background') {
+  if (message?.target !== 'background') {
     return false;
   }
 
-  handleMessage(message, sender)
+  handleMessage(message)
     .then(sendResponse)
     .catch((error) => {
       sendResponse({ ok: false, error: toUserError(error) });
@@ -265,15 +319,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleMessage(message) {
   await I18N.ready;
+  await ensureRecovery();
   switch (message?.type) {
     case 'GET_STATUS': {
       const status = await getStatus();
       const notice = consumePendingNotice();
-      return { ok: true, status: enrichStatus(status), notice };
+      return { ok: true, ...(await withSessions(status)), notice };
     }
 
     case 'START_RECORDING':
-      return startRecording();
+      return startRecording(message.sessionId);
 
     case 'PAUSE_RECORDING':
       return pauseRecording();
@@ -285,8 +340,11 @@ async function handleMessage(message) {
     case 'STOP_RECORDING':
       return stopRecording();
 
-    case 'EXPORT_RECORDING':
-      return exportRecording();
+    case 'EXPORT_SESSION':
+      return exportSession(message.sessionId, message.format);
+
+    case 'DELETE_SESSION':
+      return deleteSession(message.sessionId);
 
     case 'RESET_ALL':
       return resetAll();
@@ -299,22 +357,37 @@ async function handleMessage(message) {
     case 'OFFSCREEN_AUTO_STOPPED': {
       setActiveRecordingTabId(null);
       setAutoPaused(false);
-      readyRecording = message.recording;
-      const readyStatus = buildReadyStatus(message.recording);
       const notice = {
         level: 'warning',
         text: t('noticeAutoStopped')
       };
       pendingNotice = notice;
-      await setStatusBadge(readyStatus);
-      await broadcastStatus(readyStatus, notice);
+      const status = { state: 'idle' };
+      await setStatusBadge(status);
+      await broadcastStatus(status, notice);
+      return { ok: true };
+    }
+
+    case 'OFFSCREEN_STORAGE_FAILED': {
+      const notice = {
+        level: 'error',
+        text: t('noticeStorageFailed', [message.error || ''])
+      };
+      pendingNotice = notice;
+      await notifyUser(t('notifyActionFailedTitle'), notice.text);
+      try {
+        await pauseRecording();
+      } catch (error) {
+        // 已经不在录了。
+      }
+      await broadcastStatus(await getStatus(), notice);
       return { ok: true };
     }
 
     case 'OFFSCREEN_RECORDING_STOPPED':
       resolvePendingStopRequest(message.requestId, {
         ok: true,
-        recording: message.recording
+        session: message.session
       });
       return { ok: true };
 
@@ -337,8 +410,8 @@ async function handleMessage(message) {
       }
       return { ok: true };
 
-    case 'GET_AUTO_SYNC':
-      return { ok: true, autoSyncEnabled };
+    case 'GET_SETTINGS':
+      return { ok: true, autoSyncEnabled, keepWebm: keepWebmEnabled };
 
     case 'SET_AUTO_SYNC':
       autoSyncEnabled = !!message.enabled;
@@ -346,19 +419,21 @@ async function handleMessage(message) {
       if (!autoSyncEnabled) setAutoPaused(false);
       return { ok: true, autoSyncEnabled };
 
+    case 'SET_KEEP_WEBM':
+      keepWebmEnabled = !!message.enabled;
+      chrome.storage.local.set({ keepWebm: keepWebmEnabled });
+      return { ok: true, keepWebm: keepWebmEnabled };
+
     default:
       return { ok: false, error: t('errUnknownCommand') };
   }
 }
 
-async function startRecording() {
+// sessionId 有值 = 在已有会话上续录（新开一段追加进去）；没有 = 新建会话。
+async function startRecording(resumeSessionId) {
   const currentStatus = await getStatus();
   if (['recording', 'paused', 'stopping'].includes(currentStatus.state)) {
     return { ok: false, error: t('errAlreadyRecording') };
-  }
-
-  if (currentStatus.state === 'ready') {
-    return { ok: false, error: t('errReadyPending') };
   }
 
   const tab = await getActiveTab();
@@ -368,39 +443,62 @@ async function startRecording() {
     return { ok: false, error: t('errTabMuted') };
   }
 
-  await ensureOffscreenDocument();
-
-  const startedAt = new Date();
-  const filename = buildRecordingFilename(tab.title, startedAt);
-  const streamId = await chrome.tabCapture.getMediaStreamId({
-    targetTabId: tab.id
-  });
-
-  const response = await chrome.runtime.sendMessage({
-    target: 'offscreen',
-    type: 'START_RECORDING',
-    payload: {
-      streamId,
-      tabId: tab.id,
+  let session;
+  if (resumeSessionId) {
+    session = await RecordingStore.getSession(resumeSessionId);
+    if (!session) {
+      return { ok: false, error: t('errSessionMissing') };
+    }
+  } else {
+    const startedAt = new Date();
+    session = await RecordingStore.createSession({
       title: tab.title || 'Untitled Tab',
       pageUrl: tab.url || '',
-      filename,
-      startedAt: startedAt.toISOString()
-    }
-  });
-
-  if (!response?.ok) {
-    throw new Error(response?.error || t('errStartFailed'));
+      filename: buildRecordingFilename(tab.title, startedAt),
+      tabId: tab.id,
+      sampleRate: SESSION_SAMPLE_RATE,
+      mp3Kbps: MP3_BITRATE_KBPS,
+      keepWebm: keepWebmEnabled
+    });
   }
 
-  readyRecording = null;
+  let response;
+  try {
+    await ensureOffscreenDocument();
+
+    const streamId = await chrome.tabCapture.getMediaStreamId({
+      targetTabId: tab.id
+    });
+
+    response = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'START_RECORDING',
+      payload: {
+        streamId,
+        tabId: tab.id,
+        session
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || t('errStartFailed'));
+    }
+  } catch (error) {
+    // 新建的会话还没录到任何东西，别在列表里留个空壳。
+    if (!resumeSessionId) {
+      await RecordingStore.deleteSession(session.id).catch(() => {});
+    }
+    throw error;
+  }
+
   setActiveRecordingTabId(tab.id);
   await setStatusBadge(response.status);
   await broadcastStatus(response.status);
 
   return {
     ok: true,
-    status: response.status,
+    ...(await withSessions(response.status)),
+    resumed: !!resumeSessionId,
     warning: tab.audible === false ? t('warnTabSilent') : ''
   };
 }
@@ -422,7 +520,7 @@ async function pauseRecording() {
 
   await setStatusBadge(response.status);
   await broadcastStatus(response.status);
-  return { ok: true, status: response.status };
+  return { ok: true, ...(await withSessions(response.status)) };
 }
 
 async function resumeRecording() {
@@ -442,17 +540,19 @@ async function resumeRecording() {
 
   await setStatusBadge(response.status);
   await broadcastStatus(response.status);
-  return { ok: true, status: response.status };
+  return { ok: true, ...(await withSessions(response.status)) };
 }
 
+// MediaRecorder.stop() 是异步的，必须等最后一片 dataavailable 落盘，
+// 所以挂一个带超时的 promise，由 offscreen 的 OFFSCREEN_RECORDING_STOPPED 来 resolve。
 async function stopRecording() {
   const currentStatus = await getStatus();
   if (currentStatus.state === 'stopping') {
-    return { ok: true, status: currentStatus, message: t('msgStoppingNow') };
+    return { ok: true, ...(await withSessions(currentStatus)), message: t('msgStoppingNow') };
   }
 
   if (currentStatus.state !== 'recording' && currentStatus.state !== 'paused') {
-    return { ok: true, status: currentStatus, message: t('msgNoOngoingRecording') };
+    return { ok: true, ...(await withSessions(currentStatus)), message: t('msgNoOngoingRecording') };
   }
 
   await broadcastStatus({ ...currentStatus, state: 'stopping' });
@@ -482,90 +582,103 @@ async function stopRecording() {
   setActiveRecordingTabId(null);
   setAutoPaused(false);
 
-  if (!response.recording?.objectUrl) {
-    throw new Error(t('errStoppedNoFile'));
-  }
-
-  readyRecording = response.recording;
-  const status = buildReadyStatus(response.recording);
-  await setStatusBadge(status);
-  await broadcastStatus(status);
-
-  return {
-    ok: true,
-    status,
-    recording: toPublicRecording(response.recording)
-  };
-}
-
-async function exportRecording() {
-  const recording = await getReadyRecording();
-  if (!recording?.objectUrl) {
-    return { ok: false, error: t('errNothingToExportYet') };
-  }
-
-  const exportFormat = await getExportFormat();
-
-  const readyStatus = buildReadyStatus(recording);
-  const exportingStatus = { ...readyStatus, state: 'exporting' };
-  await setStatusBadge(exportingStatus);
-  await broadcastStatus(exportingStatus);
-
-  const restoreReady = async () => {
-    readyRecording = recording;
-    await setStatusBadge(readyStatus);
-    await broadcastStatus(readyStatus);
-  };
-
-  // 默认导出原始 WebM；选了 MP3 才让 offscreen 转码后下载转码产物。
-  let target = recording;
-  let originalObjectUrl = null;
-
-  if (exportFormat === 'mp3') {
-    try {
-      const response = await chrome.runtime.sendMessage({
-        target: 'offscreen',
-        type: 'TRANSCODE_RECORDING',
-        format: 'mp3'
-      });
-
-      if (!response?.ok || !response.recording?.objectUrl) {
-        throw new Error(response?.error || t('errTranscodeFailed'));
-      }
-
-      target = response.recording;
-      originalObjectUrl = recording.objectUrl;
-    } catch (error) {
-      await restoreReady();
-      throw error;
-    }
-  }
-
-  let downloadResult;
-  try {
-    downloadResult = await downloadRecording(target);
-  } catch (error) {
-    await restoreReady();
-    throw error;
-  }
-
-  readyRecording = null;
-  await clearReadyRecording(recording.objectUrl);
-  if (originalObjectUrl) {
-    await revokeOffscreenObjectUrl(originalObjectUrl);
-  }
-
   const status = { state: 'idle' };
   await setStatusBadge(status);
   await broadcastStatus(status);
 
   return {
     ok: true,
-    status,
-    downloadId: downloadResult.downloadId,
-    downloadMethod: downloadResult.method,
-    recording: toPublicRecording(target)
+    ...(await withSessions(status)),
+    session: toPublicSession(response.session)
   };
+}
+
+// 导出 = 把已落盘的分片按序拼起来。MP3 在录制时就编好了，所以这里没有转码等待。
+async function exportSession(sessionId, formatOverride) {
+  const session = await RecordingStore.getSession(sessionId);
+  if (!session) {
+    return { ok: false, error: t('errSessionMissing') };
+  }
+
+  if (session.state === 'recording') {
+    return { ok: false, error: t('errExportWhileRecording') };
+  }
+
+  const format = formatOverride || (await getExportFormat());
+  const baseStatus = await getStatus();
+  await broadcastStatus({ ...baseStatus, state: 'exporting' });
+
+  const restore = async () => {
+    const status = await getStatus();
+    await setStatusBadge(status);
+    await broadcastStatus(status);
+  };
+
+  let files;
+  try {
+    await ensureOffscreenDocument();
+    const response = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'BUILD_EXPORT',
+      sessionId,
+      format
+    });
+
+    if (!response?.ok || !response.files?.length) {
+      throw new Error(response?.error || t('errExportFailed'));
+    }
+
+    files = response.files;
+  } catch (error) {
+    await restore();
+    throw error;
+  }
+
+  const methods = [];
+  try {
+    for (const file of files) {
+      const result = await downloadRecording(file);
+      methods.push(result.method);
+    }
+  } catch (error) {
+    await restore();
+    throw error;
+  }
+
+  await RecordingStore.updateSession(sessionId, {
+    lastExportAt: new Date().toISOString(),
+    lastExportName: files[0].filename
+  });
+
+  const status = await getStatus();
+  await setStatusBadge(status);
+  await broadcastStatus(status);
+
+  return {
+    ok: true,
+    ...(await withSessions(status)),
+    format,
+    downloadMethod: methods[0],
+    files: files.map((file) => ({
+      filename: file.filename,
+      mimeType: file.mimeType,
+      size: file.size
+    }))
+  };
+}
+
+async function deleteSession(sessionId) {
+  const status = await getStatus();
+  if (status.sessionId === sessionId && status.state !== 'idle') {
+    return { ok: false, error: t('errDeleteWhileRecording') };
+  }
+
+  await RecordingStore.deleteSession(sessionId);
+
+  const nextStatus = await getStatus();
+  await setStatusBadge(nextStatus);
+  await broadcastStatus(nextStatus);
+  return { ok: true, ...(await withSessions(nextStatus)) };
 }
 
 async function getExportFormat() {
@@ -577,18 +690,7 @@ async function getExportFormat() {
   }
 }
 
-async function revokeOffscreenObjectUrl(objectUrl) {
-  try {
-    await chrome.runtime.sendMessage({
-      target: 'offscreen',
-      type: 'REVOKE_OBJECT_URL',
-      objectUrl
-    });
-  } catch (error) {
-    // offscreen 文档可能已经关闭。
-  }
-}
-
+// 复位只清运行时状态，不动已经存下来的录音——那是用户的数据，只能由他手动删。
 async function resetAll() {
   setActiveRecordingTabId(null);
   setAutoPaused(false);
@@ -603,7 +705,7 @@ async function resetAll() {
       type: 'FORCE_RESET'
     });
   } catch (error) {
-    // No offscreen document is alive.
+    // 没有存活的 offscreen 文档。
   }
 
   const objectUrls = Array.from(pendingDownloadObjectUrls);
@@ -616,11 +718,10 @@ async function resetAll() {
         objectUrl: url
       });
     } catch (error) {
-      // Offscreen may already be gone.
+      // offscreen 可能已经关了。
     }
   }
 
-  readyRecording = null;
   pendingNotice = null;
 
   const context = await getOffscreenContext();
@@ -628,14 +729,14 @@ async function resetAll() {
     try {
       await chrome.offscreen.closeDocument();
     } catch (error) {
-      // Already closed.
+      // 已经关闭。
     }
   }
 
   const status = { state: 'idle' };
   await setStatusBadge(status);
   await broadcastStatus(status);
-  return { ok: true, status };
+  return { ok: true, ...(await withSessions(status)) };
 }
 
 function waitForOffscreenStop(requestId) {
@@ -720,7 +821,6 @@ function validateTab(tab) {
 async function getStatus() {
   const context = await getOffscreenContext();
   if (!context) {
-    readyRecording = null;
     await setStatusBadge({ state: 'idle' });
     return { state: 'idle' };
   }
@@ -732,25 +832,36 @@ async function getStatus() {
     });
 
     if (response?.ok) {
-      if (response.recording?.objectUrl) {
-        readyRecording = response.recording;
-      }
-
       if (['recording', 'paused'].includes(response.status?.state) && response.status?.tabId) {
         setActiveRecordingTabId(response.status.tabId);
       }
 
-      const status = stripPrivateStatus(response.status);
+      const status = response.status || { state: 'idle' };
       await setStatusBadge(status);
       return status;
     }
   } catch (error) {
-    // Fall back to the document URL hash if the offscreen document is alive but busy.
+    // offscreen 活着但正忙时，退回用文档 URL 的 hash 判断。
   }
 
   const state = context.documentUrl?.includes('#recording') ? 'recording' : 'idle';
   await setStatusBadge({ state });
   return { state };
+}
+
+// popup 需要的完整快照：当前状态 + 录音记录列表 + 本地占用。
+async function withSessions(status) {
+  let sessions = [];
+  let usage = { count: 0, bytes: 0 };
+
+  try {
+    sessions = (await RecordingStore.listSessions()).map(toPublicSession);
+    usage = await RecordingStore.usage();
+  } catch (error) {
+    console.warn('[tab-audio-recorder] listing sessions failed:', error);
+  }
+
+  return { status: enrichStatus(status), sessions, usage };
 }
 
 async function getOffscreenContext() {
@@ -783,30 +894,31 @@ async function ensureOffscreenDocument() {
   }
 }
 
-async function downloadRecording(recording) {
-  if (!recording?.objectUrl || !recording?.filename) {
+// 下载双通道：chrome.downloads 主路径 + offscreen 内 <a download> 兜底。两条都要保持可用。
+async function downloadRecording(file) {
+  if (!file?.objectUrl || !file?.filename) {
     throw new Error(t('errMissingDownloadInfo'));
   }
 
-  pendingDownloadObjectUrls.add(recording.objectUrl);
+  pendingDownloadObjectUrls.add(file.objectUrl);
 
   try {
     const downloadId = await chrome.downloads.download({
-      url: recording.objectUrl,
-      filename: recording.filename,
+      url: file.objectUrl,
+      filename: file.filename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
-    watchDownloadForCleanup(downloadId, recording.objectUrl);
+    watchDownloadForCleanup(downloadId, file.objectUrl);
     return { downloadId, method: 'downloads' };
   } catch (error) {
     try {
       const fallback = await chrome.runtime.sendMessage({
         target: 'offscreen',
         type: 'DOWNLOAD_OBJECT_URL',
-        objectUrl: recording.objectUrl,
-        filename: recording.filename
+        objectUrl: file.objectUrl,
+        filename: file.filename
       });
 
       if (!fallback?.ok) {
@@ -814,49 +926,15 @@ async function downloadRecording(recording) {
       }
 
       setTimeout(
-        () => cleanupObjectUrl(recording.objectUrl),
+        () => cleanupObjectUrl(file.objectUrl),
         FALLBACK_DOWNLOAD_CLEANUP_TIMEOUT_MS
       );
 
       return { downloadId: null, method: 'anchor' };
     } catch (fallbackError) {
-      pendingDownloadObjectUrls.delete(recording.objectUrl);
+      pendingDownloadObjectUrls.delete(file.objectUrl);
       throw new Error(t('errDownloadFailed', [toUserError(error), toUserError(fallbackError)]));
     }
-  }
-}
-
-async function getReadyRecording() {
-  if (readyRecording?.objectUrl) {
-    return readyRecording;
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      target: 'offscreen',
-      type: 'GET_READY_RECORDING'
-    });
-
-    if (response?.ok && response.recording?.objectUrl) {
-      readyRecording = response.recording;
-      return readyRecording;
-    }
-  } catch (error) {
-    // No ready recording is available in the offscreen document.
-  }
-
-  return null;
-}
-
-async function clearReadyRecording(objectUrl) {
-  try {
-    await chrome.runtime.sendMessage({
-      target: 'offscreen',
-      type: 'CLEAR_READY_RECORDING',
-      objectUrl
-    });
-  } catch (error) {
-    // The offscreen document may already be gone.
   }
 }
 
@@ -900,7 +978,7 @@ async function cleanupObjectUrl(objectUrl) {
       objectUrl
     });
   } catch (error) {
-    // The offscreen document may already be gone.
+    // offscreen 可能已经关了。
   }
 
   await closeOffscreenDocumentIfIdle();
@@ -927,10 +1005,23 @@ async function setStatusBadge(status) {
   const badgeByState = {
     recording: { text: 'REC', color: '#d93025' },
     paused: { text: 'PAU', color: '#b36200' },
-    ready: { text: 'OK', color: '#16833a' },
+    stopping: { text: 'PAU', color: '#b36200' },
     exporting: { text: 'OUT', color: '#1456d9' }
   };
-  const badge = badgeByState[state] || { text: '', color: '#607089' };
+  let badge = badgeByState[state];
+
+  // 空闲时如果还有没导出过的录音，用 OK 提醒用户「东西还在这儿」。
+  if (!badge) {
+    badge = { text: '', color: '#607089' };
+    try {
+      const sessions = await RecordingStore.listSessions();
+      if (sessions.some((session) => !session.lastExportAt)) {
+        badge = { text: 'OK', color: '#16833a' };
+      }
+    } catch (error) {
+      // 读不到就不显示徽标。
+    }
+  }
 
   await chrome.action.setBadgeText({ text: badge.text });
   if (badge.text) {
@@ -943,7 +1034,7 @@ async function broadcastStatus(status, notice) {
     const payload = {
       target: 'popup',
       type: 'STATUS_CHANGED',
-      status: enrichStatus(stripPrivateStatus(status))
+      ...(await withSessions(status))
     };
     if (notice) {
       payload.notice = notice;
@@ -953,7 +1044,7 @@ async function broadcastStatus(status, notice) {
       pendingNotice = null;
     }
   } catch (error) {
-    // No popup is listening right now — keep pendingNotice for the next GET_STATUS.
+    // 没有 popup 在听——留着 pendingNotice 等下次 GET_STATUS。
   }
 }
 
@@ -963,29 +1054,24 @@ function consumePendingNotice() {
   return notice;
 }
 
-function buildReadyStatus(recording) {
-  return {
-    state: 'ready',
-    title: recording?.title || '',
-    filename: recording?.filename || '',
-    mimeType: recording?.mimeType || 'audio/webm',
-    size: recording?.size || 0,
-    durationMs: recording?.durationMs || 0,
-    elapsedMs: recording?.durationMs || 0,
-    startedAt: recording?.startedAt || '',
-    finishedAt: recording?.finishedAt || '',
-    tabId: recording?.tabId
-  };
-}
+function toPublicSession(session) {
+  if (!session) {
+    return null;
+  }
 
-function toPublicRecording(recording) {
   return {
-    filename: recording?.filename || '',
-    mimeType: recording?.mimeType || 'audio/webm',
-    size: recording?.size || 0,
-    durationMs: recording?.durationMs || 0,
-    startedAt: recording?.startedAt || '',
-    finishedAt: recording?.finishedAt || ''
+    id: session.id,
+    title: session.title || '',
+    filename: session.filename || '',
+    state: session.state || 'stopped',
+    durationMs: session.durationMs || 0,
+    bytes: (session.webmBytes || 0) + (session.mp3Bytes || 0),
+    hasWebm: !!session.keepWebm && (session.webmBytes || 0) > 0,
+    hasMp3: (session.mp3Bytes || 0) > 0,
+    segmentCount: session.segmentCount || 0,
+    interrupted: !!session.interrupted,
+    createdAt: session.createdAt || '',
+    lastExportAt: session.lastExportAt || ''
   };
 }
 
@@ -995,15 +1081,6 @@ function enrichStatus(status) {
     return { ...status, autoPaused: true };
   }
   return status;
-}
-
-function stripPrivateStatus(status) {
-  if (!status) {
-    return { state: 'idle' };
-  }
-
-  const { objectUrl, recording, ...publicStatus } = status;
-  return publicStatus;
 }
 
 function buildRecordingFilename(title, date) {

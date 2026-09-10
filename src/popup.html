@@ -34,11 +34,11 @@
           </div>
           <div class="info-row">
             <span data-i18n="labelSaveMode">保存方式</span>
-            <strong data-i18n="valueManualExport">手动导出</strong>
+            <strong data-i18n="valueLiveSave">边录边存到本地</strong>
           </div>
           <div class="info-row">
-            <span data-i18n="labelFileState">文件状态</span>
-            <strong id="fileState" data-i18n="fileStateNone">未生成</strong>
+            <span data-i18n="labelLocalUsage">本地占用</span>
+            <strong id="usageText">0 B</strong>
           </div>
         </section>
 
@@ -56,11 +56,17 @@
             <button id="pauseButton" class="secondary" type="button" disabled data-i18n="btnPause">暂停录制</button>
             <button id="stopButton" class="danger" type="button" disabled data-i18n="btnStop">停止录制</button>
           </div>
-          <button id="exportButton" class="success" type="button" disabled data-i18n="btnExport">导出录音文件</button>
-          <button id="resetButton" class="ghost" type="button" data-i18n="btnReset">重置</button>
         </div>
 
         <p class="message" id="message" role="status" aria-live="polite"></p>
+
+        <section class="sessions" aria-label="录音记录" data-i18n-aria="ariaSessions">
+          <p class="group-label" id="sessionsLabel" data-i18n="sessionsHeading">录音记录</p>
+          <p class="sessions-empty" id="sessionsEmpty" data-i18n="sessionsEmpty">还没有录音。录下来的内容会实时保存在这里，浏览器关掉也不会丢。</p>
+          <div class="session-list" id="sessionList"></div>
+        </section>
+
+        <button id="resetButton" class="ghost" type="button" data-i18n="btnReset">重置</button>
       </div>
 
       <div id="settingsView" hidden>
@@ -118,6 +124,18 @@
             <span class="opt-check" aria-hidden="true">✓</span>
           </button>
         </div>
+
+        <p class="group-label" data-i18n="settingStorage">本地存储</p>
+        <div class="opt-list">
+          <div class="info-row">
+            <span data-i18n="settingKeepWebm">保留无损 WebM 原始数据</span>
+            <label class="toggle">
+              <input type="checkbox" id="keepWebmToggle">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+        </div>
+        <p class="group-hint" data-i18n="settingKeepWebmHint">关掉后只保留实时编码的 MP3，磁盘占用减半，但无法再导出无损原始文件。</p>
       </div>
     </main>
 

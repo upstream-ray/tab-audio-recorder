@@ -13,13 +13,16 @@ def load(p):
 
 en = load("_locales/en/messages.json")
 zh = load("_locales/zh_CN/messages.json")
+tw = load("_locales/zh_TW/messages.json")
 
 problems = []
 
-# 1. key 集合一致
-en_keys, zh_keys = set(en), set(zh)
+# 1. key 集合一致（三个语言都要对齐）
+en_keys, zh_keys, tw_keys = set(en), set(zh), set(tw)
 if en_keys != zh_keys:
-    problems.append(f"en/zh key 不一致: 仅en={en_keys-zh_keys} 仅zh={zh_keys-en_keys}")
+    problems.append(f"en/zh_CN key 不一致: 仅en={en_keys-zh_keys} 仅zh_CN={zh_keys-en_keys}")
+if en_keys != tw_keys:
+    problems.append(f"en/zh_TW key 不一致: 仅en={en_keys-tw_keys} 仅zh_TW={tw_keys-en_keys}")
 
 # 2. 收集代码 / manifest 引用的 key
 referenced = set()
@@ -46,10 +49,10 @@ unused = en_keys - referenced
 if unused:
     print("提示·未被引用的 key（可能是有意保留）:", sorted(unused))
 
-print(f"\nen keys: {len(en_keys)} | zh keys: {len(zh_keys)} | 代码引用: {len(referenced)}")
+print(f"\nen keys: {len(en_keys)} | zh_CN keys: {len(zh_keys)} | zh_TW keys: {len(tw_keys)} | 代码引用: {len(referenced)}")
 if problems:
     print("\n❌ 问题:")
     for p in problems:
         print("  -", p)
     sys.exit(1)
-print("\n✅ i18n 校验通过：JSON 合法、双语 key 一致、引用全部命中。")
+print("\n✅ i18n 校验通过：JSON 合法、三语 key 一致、引用全部命中。")

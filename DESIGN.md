@@ -59,10 +59,23 @@
 
 右上角 `<output>` 元素，等宽数字（`font-variant-numeric: tabular-nums`），浅灰边框小卡片样式。
 
+## 录音记录列表
+
+主视图底部的 `.session-list`。每条录音是一张 frosted 卡片（`.session-item`），内部两行：
+
+- 第一行：录音标题，单行截断
+- 第二行：`.session-meta`——时长 · 占用大小 · 段数 · 状态 · 是否已导出，用 ` · ` 连接，等宽数字
+
+卡片下方是三个 `.chip` 按钮（继续录制 / 导出 / 删除），等宽平分，30px 高、10px 圆角：中性 chip 用 `--hover-overlay`，导出用 `--primary-tint`，删除用 `--danger-tint`。正在录制的那条卡片边框用 `--danger` 高亮。
+
+列表最高 268px，超出内部滚动，避免 popup 无限变长。没有录音时显示 `.sessions-empty` 说明文案。
+
 ## 消息区
 
 底部 `.message` 区域，用于状态提示和错误信息。通过 `.error`（红）和 `.warning`（橙）类名切换颜色。
 
 ## 暗色模式
 
-当前未实现。未来如需添加，在 `:root` 下用 `prefers-color-scheme: dark` 媒体查询覆盖 CSS 变量即可，不需要改 HTML 结构。
+已实现：`:root` 定义浅色 token，`:root[data-theme="dark"]` 与 `@media (prefers-color-scheme: dark)` 下的 `:root[data-theme="auto"]` 分别覆盖。主题偏好存在 `chrome.storage.local` 的 `uiTheme`（light / dark / auto），只换 token，不改 HTML 结构。
+
+> 注：本文的色彩 token 表沿自 v1，0.2.0 的 frosted-glass 改版后 `popup.css` 实际使用的是另一套 Apple 风格 token，两者尚未对齐。

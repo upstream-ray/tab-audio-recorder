@@ -381,17 +381,15 @@ button:disabled {
   transform: none;
 }
 
-/* primary CTA (start; export once a recording is ready) */
-#startButton,
-#exportButton {
+/* primary CTA (start recording) */
+#startButton {
   background: var(--primary-grad);
   color: #ffffff;
   font-weight: 600;
   box-shadow: var(--primary-shadow);
 }
 
-#startButton:hover:not(:disabled),
-#exportButton:hover:not(:disabled) {
+#startButton:hover:not(:disabled) {
   background: var(--primary-grad-hover);
 }
 
@@ -426,8 +424,7 @@ button:disabled {
 /* any disabled stacked action button reads as a quiet frosted neutral */
 #startButton:disabled,
 #pauseButton:disabled,
-#stopButton:disabled,
-#exportButton:disabled {
+#stopButton:disabled {
   background: var(--card-bg);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -543,6 +540,118 @@ button:disabled {
 
 .opt-row.active .opt-check {
   opacity: 1;
+}
+
+/* ---------- sessions (录音记录) ---------- */
+.sessions {
+  margin-top: 14px;
+}
+
+.sessions-empty {
+  margin: 0 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.session-list {
+  display: grid;
+  gap: 8px;
+  max-height: 268px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.session-item {
+  padding: 10px 12px;
+  border-radius: var(--radius-group);
+  background: var(--card-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 0 var(--card-hi);
+}
+
+.session-item.active {
+  border-color: var(--danger);
+}
+
+.session-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.session-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.session-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chip {
+  width: auto;
+  flex: 1 1 0;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--hover-overlay);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--card-hover);
+}
+
+.chip.primary:not(:disabled) {
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+
+.chip.primary:not(:disabled):hover {
+  background: var(--primary-tint-hover);
+}
+
+.chip.danger:not(:disabled) {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.chip.danger:not(:disabled):hover {
+  background: var(--danger-tint-hover);
+}
+
+.chip:disabled {
+  background: transparent;
+  color: var(--disabled-ink);
+}
+
+/* reset 按钮现在挂在录音记录下面，和列表拉开一点距离 */
+#resetButton {
+  margin-top: 12px;
+}
+
+.group-hint {
+  margin: 6px 6px 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
 @media (prefers-reduced-motion: reduce) {

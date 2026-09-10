@@ -13,7 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. 改动后：在扩展卡片上点击「重新加载」（service worker 和 offscreen 文档都会重建）。
 4. 调试入口：
    - `src/background.js`：扩展详情页的「Service Worker」链接。
-   - `src/offscreen.js`：在 `chrome://extensions` 的「检查视图」里找 `offscreen.html`，只有录音进行时才存在。
+   - `src/offscreen.js`：在 `chrome://extensions` 的「检查视图」里找 `offscreen.html`，只有录音 / 导出进行时才存在。
+   - 录音数据：DevTools → Application → IndexedDB → `tab-audio-recorder`（`sessions` / `chunks` / `mp3`）。
    - `src/popup.js`：右键扩展图标 → 检查弹出内容。
 
 要求 Chrome / Chromium-Edge 116+（依赖 `chrome.offscreen` + `chrome.tabCapture`）。
@@ -22,7 +23,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **不要让标签页静音**：`keepCapturedAudioAudible` 把流接到 `AudioContext.destination`。删了这段用户就听不到声音了。
 - **下载有兜底**：`chrome.downloads.download` 主路径 + offscreen 内 `<a download>` fallback 路径。两条都要保持可用。
-- **录音全程驻留内存**：blob 不分段、不落盘。长时录音会吃内存。
+- **落地即写**：每片 WebM（1 秒）和每块实时编码的 MP3（约 5 秒）都直接进 IndexedDB。不要为了「优化」在内存里攒——崩溃时丢多少取决于最后一次落盘距今多久。
+- **双写不是冗余**：跨次续录的多段 WebM 无法字节拼接成单文件，单文件靠实时编码的 MP3。删了 MP3 旁路就没有跨天续录了。
+- **importScripts 用绝对 URL**：service worker 里相对路径以脚本自身位置为基准，`'src/store.js'` 会解析成 `src/src/store.js` 并静默失败。
 - **隐私边界**：不上传、不调外部 API、不录麦克风。任何引入网络请求或额外 host permission 的改动都要先和用户确认。
 
 详细架构说明见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。

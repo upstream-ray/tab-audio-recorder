@@ -10,6 +10,7 @@ AI 协作入口文档。开始任何开发工作前，先读这份文件获取�
 | **DESIGN** | [`DESIGN.md`](DESIGN.md) | 视觉与 UX——色彩、布局、组件规范 |
 | **ARCHITECTURE** | [`ARCHITECTURE.md`](ARCHITECTURE.md) | 技术选型、三层架构、状态机、关键约束 |
 | **v1 PRD** | [`iterations/v1-launch/PRD.md`](iterations/v1-launch/PRD.md) | v1 功能需求与验收标准 |
+| **v2 PRD** | [`iterations/v2-persistent-sessions/PRD.md`](iterations/v2-persistent-sessions/PRD.md) | 持久化会话与跨次续录（当前迭代） |
 
 ## 阅读顺序
 
@@ -26,6 +27,7 @@ AI 协作入口文档。开始任何开发工作前，先读这份文件获取�
 - **保持声音回放**：`keepCapturedAudioAudible` 不能删。删了用户就听不到标签页声音了。
 - **下载双通道**：`chrome.downloads` 主路径 + offscreen `<a download>` 兜底路径，两条都要保持可用。
 - **状态归 background**：popup 是纯展示层，不持有状态。所有用户操作都委托给 background 处理。
+- **录音落地即写**：音频分片产生的当下就写 IndexedDB，不在内存里攒。用户的录音数据只在他明确删除时才消失，导出不销毁数据。
 
 ## 迭代方式
 

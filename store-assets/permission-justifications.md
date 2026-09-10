@@ -4,7 +4,7 @@ Use these explanations in the Chrome Web Store privacy and permissions review fi
 
 ## Single Purpose
 
-Tab Audio Recorder lets users record audio from the currently selected browser tab and export the recording locally as a WebM/Opus or MP3 file. It does not upload recordings, record microphone audio, capture system-wide audio, or communicate with external servers.
+Tab Audio Recorder lets users record audio from the currently selected browser tab and export the recording locally as a WebM/Opus or MP3 file. Recordings are written to local browser storage as they are captured, so an interrupted session can be resumed later and is not lost if the browser closes. It does not upload recordings, record microphone audio, capture system-wide audio, or communicate with external servers.
 
 ## `tabCapture`
 
@@ -33,6 +33,10 @@ Required to show recording status messages when the user controls recording with
 ## `storage`
 
 Required to save local extension state and user preferences — such as auto-pause behavior, interface language, theme, and export format. Data remains in the user's browser.
+
+## `unlimitedStorage`
+
+Required to store recordings in local IndexedDB while they are being captured. Audio is written to disk continuously so that a long recording does not have to be held in memory and is not lost if the browser is closed, and so the user can continue a paused recording on a later day. A multi-hour recording exceeds the default storage quota. All recorded data stays on the user's device and is deleted when the user deletes the recording in the extension.
 
 ## Host Permissions
 
